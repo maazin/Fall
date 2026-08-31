@@ -175,6 +175,36 @@
     text-shadow:0 3px 0 var(--bubblegum-dk),0 0 12px rgba(255,255,255,.7);
     animation:floatUp .85s ease-out forwards;
   }
+  #storm{
+    position:absolute;inset:0;z-index:15;pointer-events:none;
+    background:linear-gradient(180deg,#2E4763 0%,#5C7590 55%,#8FA3B8 100%);
+    opacity:0;transition:opacity .8s linear;mix-blend-mode:multiply;
+  }
+  #flash{
+    position:absolute;inset:0;z-index:16;pointer-events:none;
+    background:#fff;opacity:0;
+  }
+  #flash.zap{animation:zapFlash .38s ease-out}
+  @keyframes zapFlash{0%{opacity:.72}30%{opacity:.12}55%{opacity:.5}100%{opacity:0}}
+
+  #wave{
+    position:absolute;left:50%;top:26%;z-index:36;pointer-events:none;
+    transform:translate(-50%,0);
+    font-family:"Baloo 2",sans-serif;font-weight:800;font-size:clamp(26px,6vw,46px);
+    color:#fff;white-space:nowrap;opacity:0;
+    text-shadow:0 4px 0 var(--bubblegum-dk),0 0 18px rgba(255,255,255,.65);
+  }
+  #wave.go{animation:waveIn 1.9s ease-out}
+  @keyframes waveIn{
+    0%{opacity:0;transform:translate(-50%,18px) scale(.7)}
+    18%{opacity:1;transform:translate(-50%,0) scale(1.08)}
+    30%{transform:translate(-50%,0) scale(1)}
+    78%{opacity:1}
+    100%{opacity:0;transform:translate(-50%,-26px) scale(1)}
+  }
+
+  .faller.bolt .art{animation-duration:.5s;filter:drop-shadow(0 0 14px rgba(255,225,120,.95))}
+  .float.zap{text-shadow:0 3px 0 #8A5A00,0 0 14px rgba(255,240,170,.9)}
   .float.star{text-shadow:0 3px 0 #C98800,0 0 12px rgba(255,255,255,.8)}
   .float.bad{text-shadow:0 3px 0 #47637A,0 0 12px rgba(255,255,255,.6)}
   @keyframes floatUp{
@@ -295,7 +325,7 @@
   @keyframes hop{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-12px) rotate(4deg)}}
 
   @media (prefers-reduced-motion:reduce){
-    .cloud,.faller .art,#overBuddy,#timePill.low{animation:none !important}
+    .cloud,.faller .art,#overBuddy,#timePill.low,#flash.zap{animation:none !important}
     .card{animation:none}
   }
 </style>
@@ -312,6 +342,9 @@
   <div id="ground" aria-hidden="true"></div>
   <div id="flowers" aria-hidden="true"></div>
 
+  <div id="storm" aria-hidden="true"></div>
+  <div id="flash" aria-hidden="true"></div>
+
   <div id="stage" aria-hidden="true"></div>
   <canvas id="fx"></canvas>
 
@@ -322,6 +355,8 @@
     <button class="icon-btn" id="muteBtn" title="Sound on/off" aria-label="Sound on or off">🔊</button>
   </div>
 
+  <div id="wave" aria-hidden="true"></div>
+
   <div id="countdown" class="hidden"><b>3</b></div>
 
   <!-- TITLE -->
@@ -329,12 +364,13 @@
     <div class="card">
       <p class="eyebrow">A very squishy game</p>
       <h1>Squish Squad Catch</h1>
-      <p class="lede">The squad is falling out of the sky! Slide your buddy left and right and catch as many friends as you can before the timer runs out.</p>
+      <p class="lede">The squad is falling out of the sky! Slide your buddy left and right and catch as many friends as you can. It starts gentle, then a storm rolls in — you only get 3 hearts.</p>
 
       <div class="rules">
         <div class="rule"><span class="chip" id="ruleFriend"></span><span>Catch a friend<small>+1 point</small></span></div>
         <div class="rule"><span class="chip">⭐</span><span>Grab a star<small>+5 points</small></span></div>
         <div class="rule"><span class="chip">🌧️</span><span>Dodge grumpy rain<small>−1 heart</small></span></div>
+        <div class="rule"><span class="chip">⚡</span><span>Watch for lightning<small>−1 heart, fast!</small></span></div>
       </div>
 
       <button class="btn" id="toPickBtn">Pick my buddy!</button>
@@ -389,10 +425,13 @@
   const screenPick = document.getElementById('screenPick');
   const screenOver = document.getElementById('screenOver');
   const buddyGrid = document.getElementById('buddyGrid');
+  const stormEl = document.getElementById('storm');
+  const flashEl = document.getElementById('flash');
+  const waveEl = document.getElementById('wave');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const ROUND = 60;
-  const MAX_HEARTS = 5;
+  const MAX_HEARTS = 3;
 
   let W = 0, H = 0, groundY = 0;
   let picked = 0;
@@ -401,6 +440,17 @@
   let fallers = [], particles = [];
   let score = 0, hearts = MAX_HEARTS, timeLeft = ROUND, combo = 0;
   let running = false, lastT = 0, spawnT = 0, elapsed = 0, raf = 0;
+  let waveIdx = 0;
+
+  /* ---------------- difficulty curve ----------------
+     ramp: 0 at kickoff -> 1 by ~46s, so the last stretch is the peak. */
+  function ramp(){ return Math.min(1, elapsed / 46); }
+  function stormRamp(){ return Math.max(0, Math.min(1, (elapsed - 22) / 26)); }
+  const WAVES = [
+    { at: 14, text: 'Picking up speed!' },
+    { at: 26, text: 'Storm rolling in \u26A1' },
+    { at: 42, text: 'Final push!' }
+  ];
 
   /* ---------------- sound ---------------- */
   let ac = null, muted = false;
@@ -428,6 +478,8 @@
     tick(){ tone(700,0,.09,'square',.09); },
     go(){ [520,660,880].forEach((f,i)=>tone(f,i*.07,.2,'triangle',.16)); },
     tap(){ tone(880,0,.07,'sine',.10); },
+    zap(){ tone(1100,0,.05,'sawtooth',.12); tone(180,.04,.3,'sawtooth',.13); },
+    wave(){ [440,588,740].forEach((f,i)=>tone(f,i*.06,.24,'triangle',.13)); },
     fanfare(){ [523,659,784,1047,1319].forEach((f,i)=>tone(f,i*.11,.36,'triangle',.15)); }
   };
 
@@ -505,6 +557,9 @@
     stage.innerHTML = '';
     fallers = []; particles = [];
     score = 0; hearts = MAX_HEARTS; timeLeft = ROUND; combo = 0; elapsed = 0; spawnT = 0;
+    waveIdx = 0;
+    stormEl.style.opacity = 0;
+    waveEl.classList.remove('go');
     scoreVal.textContent = '0';
     timeVal.textContent = ROUND;
     timePill.classList.remove('low');
@@ -562,10 +617,18 @@
 
   function spawn(){
     const s = fallerSize();
+    const d = ramp();
     const r = Math.random();
+
+    // hazard mix widens as the round goes on
+    const starC = 0.07;
+    const boltC = elapsed > 22 ? 0.03 + 0.11 * stormRamp() : 0;
+    const rainC = elapsed > 5 ? 0.06 + 0.19 * d : 0;
+
     let kind = 'friend';
-    if(r > 0.93) kind = 'star';
-    else if(r > 0.86 && elapsed > 6) kind = 'rain';
+    if(r < starC) kind = 'star';
+    else if(r < starC + boltC) kind = 'bolt';
+    else if(r < starC + boltC + rainC) kind = 'rain';
 
     const el = document.createElement('div');
     el.className = 'faller';
@@ -580,6 +643,13 @@
         '<path d="M50 6l12.6 25.6 28.3 4.1-20.5 20 4.9 28.2L50 70.6 24.7 83.9l4.9-28.2-20.5-20 28.3-4.1z" fill="#FFC53C" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>' +
         '<circle cx="40" cy="45" r="4.2" fill="#4B2A55"/><circle cx="60" cy="45" r="4.2" fill="#4B2A55"/>' +
         '<path d="M42 56c3 4 13 4 16 0" stroke="#4B2A55" stroke-width="4" fill="none" stroke-linecap="round"/></svg></div>';
+    } else if(kind === 'bolt'){
+      el.classList.add('bolt');
+      el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%">' +
+        '<g><ellipse cx="50" cy="38" rx="36" ry="21" fill="#6B7C90" stroke="#fff" stroke-width="4"/>' +
+        '<path d="M36 30l8 8M44 30l-8 8M58 30l8 8M66 30l-8 8" stroke="#2B3947" stroke-width="4" stroke-linecap="round"/>' +
+        '<path d="M40 50c4 5 16 5 20 0" stroke="#2B3947" stroke-width="4" fill="none" stroke-linecap="round"/>' +
+        '<path d="M54 54L34 82h14l-6 16 24-30H50z" fill="#FFD84D" stroke="#fff" stroke-width="4" stroke-linejoin="round"/></g></svg></div>';
     } else {
       el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%">' +
         '<g><ellipse cx="50" cy="44" rx="38" ry="24" fill="#9FB4C6" stroke="#fff" stroke-width="4"/>' +
@@ -592,13 +662,17 @@
       el: el, kind: kind, size: s,
       x: s/2 + Math.random() * Math.max(1, W - s),
       y: -s,
-      vy: 140 + elapsed * 2.9 + Math.random() * 55,
-      sway: (Math.random() * 2 - 1) * 26,
+      vy: (118 + 252 * d + Math.random() * (40 + 40 * d)) * (kind === 'bolt' ? 1.5 : 1),
+      sway: (Math.random() * 2 - 1) * (kind === 'bolt' ? 10 : 20 + 26 * d),
       phase: Math.random() * 6.28,
       dead: false
     };
     stage.appendChild(el);
     fallers.push(f);
+    if(kind === 'bolt' && !reduceMotion){
+      flashEl.style.opacity = 0.16;
+      setTimeout(function(){ flashEl.style.opacity = 0; }, 90);
+    }
   }
 
   function floatText(text, x, y, cls){
@@ -633,6 +707,19 @@
     el.style.setProperty('--tf', 'translate(' + (cx - f.size/2) + 'px,' + (cy - f.size/2) + 'px)');
     el.classList.add('pop');
     setTimeout(function(){ el.remove(); }, 340);
+
+    if(f.kind === 'bolt'){
+      hearts = Math.max(0, hearts - 1);
+      combo = 0;
+      drawHearts();
+      if(!reduceMotion){ flashEl.classList.remove('zap'); void flashEl.offsetWidth; flashEl.classList.add('zap'); }
+      player.classList.remove('ouch'); void player.offsetWidth; player.classList.add('ouch');
+      floatText('zap!', cx, cy, 'zap');
+      burst(cx, cy, ['#FFD84D','#FFF3B8','#6B7C90','#FFF'], 20);
+      sfx.zap();
+      if(hearts === 0) finish();
+      return;
+    }
 
     if(f.kind === 'rain'){
       hearts = Math.max(0, hearts - 1);
@@ -686,10 +773,22 @@
     placePlayer();
 
     // spawn
+    // storm darkens + wave call-outs
+    const sr = stormRamp();
+    stormEl.style.opacity = (sr * 0.30).toFixed(3);
+    if(waveIdx < WAVES.length && elapsed >= WAVES[waveIdx].at){
+      waveEl.textContent = WAVES[waveIdx].text;
+      waveEl.classList.remove('go'); void waveEl.offsetWidth; waveEl.classList.add('go');
+      sfx.wave();
+      waveIdx++;
+    }
+
+    // spawn — the gap tightens steadily
     spawnT -= dt;
     if(spawnT <= 0){
       spawn();
-      spawnT = Math.max(0.38, 0.95 - elapsed * 0.010);
+      const d = ramp();
+      spawnT = (1.00 - 0.63 * Math.pow(d, 0.85)) * (0.86 + Math.random() * 0.28);
     }
 
     // fallers
@@ -774,6 +873,8 @@
     fallers.forEach(function(f){ f.el.remove(); });
     fallers = [];
     hud.classList.add('hidden');
+    stormEl.style.opacity = 0;
+    waveEl.classList.remove('go');
     if(player) player.remove();
     if(playerShadow) playerShadow.remove();
 
@@ -782,7 +883,7 @@
     const isBest = score > best;
     if(isBest){ try{ localStorage.setItem('squishBest', String(score)); }catch(e){} best = score; }
 
-    const tier = score >= 45 ? 3 : score >= 26 ? 2 : score >= 10 ? 1 : 0;
+    const tier = score >= 38 ? 3 : score >= 22 ? 2 : score >= 9 ? 1 : 0;
     const titles = ['Nice try, squishy!', 'Good catching!', 'Super squisher!', 'Squish Squad champion!'];
     const eyebrows = ['Round over', 'Round over', 'Wow', 'Legendary'];
 
