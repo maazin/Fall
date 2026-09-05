@@ -139,6 +139,28 @@
     font-variant-numeric:tabular-nums;
   }
   .pill .cap{font-family:"Nunito",sans-serif;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--plum-soft)}
+  #comboPill{
+    display:none;align-items:center;gap:7px;
+    background:linear-gradient(135deg,#FF7CC0,#FF4F9A);
+    border:4px solid #fff;border-radius:999px;padding:5px 14px;
+    box-shadow:0 5px 0 var(--bubblegum-dk);
+    font-family:"Baloo 2",sans-serif;font-weight:800;color:#fff;font-size:clamp(15px,2.2vw,20px);
+  }
+  #comboPill.on{display:flex;animation:comboPop .3s cubic-bezier(.2,1.7,.4,1)}
+  @keyframes comboPop{0%{transform:scale(.6)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+  #comboBar{width:44px;height:7px;border-radius:99px;background:rgba(255,255,255,.35);overflow:hidden}
+  #comboBar i{display:block;height:100%;width:100%;background:#fff;border-radius:99px}
+
+  #pwRow{display:flex;gap:6px;align-items:center}
+  .pw{
+    display:flex;align-items:center;gap:5px;
+    background:var(--cream);border:3px solid #fff;border-radius:999px;padding:3px 10px 3px 6px;
+    box-shadow:0 4px 0 var(--shadow);
+    font-family:"Baloo 2",sans-serif;font-weight:800;font-size:14px;color:var(--plum);
+    font-variant-numeric:tabular-nums;
+  }
+  .pw svg{width:19px;height:19px;flex:none}
+
   #hearts{display:flex;gap:4px;margin-left:auto}
   .heart{width:24px;height:24px;transition:transform .25s ease,opacity .25s ease}
   .heart.gone{opacity:.22;transform:scale(.72)}
@@ -352,6 +374,61 @@
   .rule .chip{width:42px;height:42px;flex:none;display:grid;place-items:center}
   .rule small{display:block;font-weight:700;color:var(--plum-soft);font-size:12.5px}
 
+  .seg{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+  .seg button{
+    font-family:"Baloo 2",sans-serif;font-weight:800;font-size:15px;
+    background:#fff;color:var(--plum-soft);
+    border:4px solid #fff;border-radius:999px;padding:7px 18px;cursor:pointer;
+    box-shadow:0 4px 0 rgba(75,42,85,.12);
+    transition:transform .12s ease,box-shadow .12s ease,background .12s ease,color .12s ease;
+  }
+  .seg button small{display:block;font-family:"Nunito",sans-serif;font-size:10.5px;font-weight:800;opacity:.75}
+  .seg button:hover{transform:translateY(-2px)}
+  .seg button.sel{background:var(--grape);border-color:#fff;color:#fff;box-shadow:0 4px 0 #5B41C4}
+  .seg-label{
+    font-family:"Nunito",sans-serif;font-weight:900;font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--plum-soft);margin-top:18px;
+  }
+
+  .squad{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:18px}
+  @media (max-width:560px){.squad{grid-template-columns:repeat(3,1fr)}}
+  .sq{
+    background:#fff;border-radius:18px;padding:8px 6px 10px;
+    box-shadow:0 4px 0 rgba(75,42,85,.10);
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+  }
+  .sq img{width:100%;aspect-ratio:1;object-fit:contain}
+  .sq span{font-family:"Baloo 2",sans-serif;font-weight:700;font-size:12px;color:var(--plum);line-height:1.1}
+  .sq b{font-family:"Nunito",sans-serif;font-weight:900;font-size:10px;color:var(--mint);text-transform:uppercase;letter-spacing:.04em}
+  .sq.locked{opacity:.45}
+  .sq.locked img{filter:grayscale(1) contrast(.5) brightness(1.25)}
+  .sq.locked b{color:var(--plum-soft)}
+
+  .badges{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+  @media (max-width:560px){.badges{grid-template-columns:1fr}}
+  .bdg{
+    display:flex;align-items:center;gap:9px;text-align:left;
+    background:#fff;border-radius:16px;padding:8px 12px;
+    box-shadow:0 3px 0 rgba(75,42,85,.10);opacity:.42;
+    font-family:"Baloo 2",sans-serif;font-weight:700;font-size:13px;color:var(--plum);
+  }
+  .bdg.got{opacity:1;box-shadow:0 3px 0 var(--sun);background:#FFFAEC}
+  .bdg .ico{font-size:22px;line-height:1;filter:grayscale(1)}
+  .bdg.got .ico{filter:none}
+  .bdg small{display:block;font-family:"Nunito",sans-serif;font-weight:700;font-size:10.5px;color:var(--plum-soft)}
+
+  .board{list-style:none;margin:14px 0 0;padding:0;text-align:left;max-width:340px;margin-inline:auto}
+  .board li{
+    display:flex;align-items:center;gap:10px;
+    background:#fff;border-radius:16px;padding:8px 14px;margin-bottom:7px;
+    box-shadow:0 3px 0 rgba(75,42,85,.10);
+    font-family:"Baloo 2",sans-serif;font-weight:700;color:var(--plum);font-size:14px;
+  }
+  .board li img{width:34px;height:34px;object-fit:contain;flex:none}
+  .board li b{margin-left:auto;font-size:19px;color:var(--bubblegum-dk);font-variant-numeric:tabular-nums}
+  .board li span small{display:block;font-family:"Nunito",sans-serif;font-weight:800;font-size:10.5px;color:var(--plum-soft)}
+  .board .empty{justify-content:center;color:var(--plum-soft);font-weight:800}
+
   .opt{
     display:inline-flex;align-items:center;gap:9px;margin-top:16px;cursor:pointer;
     font-family:"Nunito",sans-serif;font-weight:800;font-size:13px;color:var(--plum-soft);
@@ -435,6 +512,8 @@
   <div id="hud" class="hidden">
     <div class="pill"><span class="cap">Score</span><span id="scoreVal">0</span></div>
     <div class="pill" id="timePill"><span class="cap">Time</span><span id="timeVal">60</span></div>
+    <div id="comboPill"><span id="comboVal">x2</span><span id="comboBar"><i></i></span></div>
+    <div id="pwRow"></div>
     <div id="hearts"></div>
     <button class="icon-btn" id="pauseBtn" title="Pause" aria-label="Pause">⏸️</button>
     <button class="icon-btn" id="muteBtn" title="Sound on/off" aria-label="Sound on or off">🔊</button>
@@ -458,16 +537,35 @@
     <div class="card">
       <p class="eyebrow">A very squishy game</p>
       <h1>Squish Squad Catch</h1>
-      <p class="lede">The squad is falling out of the sky! Slide your buddy left and right and catch as many friends as you can. It starts gentle, then a storm rolls in — you only get 3 hearts. Every buddy has its own perk, so pick carefully.</p>
+      <p class="lede">The squad is falling out of the sky! Slide your buddy left and right and catch as many friends as you can. It starts gentle, then a storm rolls in. Chain catches for a multiplier, grab the bubbles, and pick your buddy carefully — each one has its own perk.</p>
 
       <div class="rules">
         <div class="rule"><span class="chip" id="ruleFriend"></span><span>Catch a friend<small>+1 point</small></span></div>
         <div class="rule"><span class="chip">⭐</span><span>Grab a star<small>+5 points</small></span></div>
         <div class="rule"><span class="chip">🌧️</span><span>Dodge grumpy rain<small>−1 heart</small></span></div>
         <div class="rule"><span class="chip">⚡</span><span>Watch for lightning<small>−1 heart, fast!</small></span></div>
+        <div class="rule"><span class="chip">🫧</span><span>Pop a bubble<small>heart, shield, magnet…</small></span></div>
+        <div class="rule"><span class="chip">🔥</span><span>Chain catches<small>up to x4 points</small></span></div>
+      </div>
+
+      <p class="seg-label">Mode</p>
+      <div class="seg" id="modeSeg">
+        <button type="button" data-mode="round" class="sel">60 seconds<small>Beat the clock</small></button>
+        <button type="button" data-mode="endless">Endless<small>Until your hearts go</small></button>
+      </div>
+
+      <p class="seg-label">Difficulty</p>
+      <div class="seg" id="diffSeg">
+        <button type="button" data-diff="chill">Chill<small>5 hearts, gentle</small></button>
+        <button type="button" data-diff="normal" class="sel">Normal<small>3 hearts</small></button>
+        <button type="button" data-diff="storm">Storm<small>2 hearts, brutal</small></button>
       </div>
 
       <button class="btn" id="toPickBtn">Pick my buddy!</button>
+      <div class="btn-row">
+        <button class="btn ghost" id="boardBtn">Best runs</button>
+        <button class="btn ghost" id="squadBtn">Squad book</button>
+      </div>
       <label class="opt"><input type="checkbox" id="flashOpt"> Turn off lightning flashes</label>
     </div>
   </section>
@@ -480,6 +578,28 @@
       Tap the squishmallow you want to play as — each one plays a little differently.
       <div class="buddies" id="buddyGrid"></div>
       <div class="btn-row"><button class="btn" id="startBtn">Let's play!</button></div>
+    </div>
+  </section>
+
+  <!-- SQUAD BOOK -->
+  <section class="screen hidden" id="screenSquad">
+    <div class="card">
+      <p class="eyebrow" id="squadTally">0 of 10 buddies met</p>
+      <h2>Squad book</h2>
+      <div class="squad" id="squadGrid"></div>
+      <p class="seg-label">Badges</p>
+      <div class="badges" id="badgeRow"></div>
+      <div class="btn-row"><button class="btn" id="squadBackBtn">Back</button></div>
+    </div>
+  </section>
+
+  <!-- BEST RUNS -->
+  <section class="screen hidden" id="screenBoard">
+    <div class="card">
+      <p class="eyebrow">Hall of squish</p>
+      <h2>Best runs</h2>
+      <ol class="board" id="boardList"></ol>
+      <div class="btn-row"><button class="btn" id="boardBackBtn">Back</button></div>
     </div>
   </section>
 
@@ -537,6 +657,8 @@
   const screenTitle = document.getElementById('screenTitle');
   const screenPick = document.getElementById('screenPick');
   const screenOver = document.getElementById('screenOver');
+  const screenBoard = document.getElementById('screenBoard');
+  const screenSquad = document.getElementById('screenSquad');
   const buddyGrid = document.getElementById('buddyGrid');
   const stormEl = document.getElementById('storm');
   const flashEl = document.getElementById('flash');
@@ -547,33 +669,82 @@
   const starsEl = document.getElementById('stars');
   const moonEl = document.getElementById('moon');
   const sunEl = document.getElementById('sun');
+  const comboPill = document.getElementById('comboPill');
+  const comboVal = document.getElementById('comboVal');
+  const comboBarFill = document.querySelector('#comboBar i');
+  const pwRow = document.getElementById('pwRow');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const ROUND = 60;
-  const MAX_HEARTS = 3;
+
+  /* ---------------- modes and difficulty ---------------- */
+  const DIFFS = {
+    chill:  { hearts:5, pace:0.70, boltAt:34, label:'Chill'  },
+    normal: { hearts:3, pace:1.00, boltAt:22, label:'Normal' },
+    storm:  { hearts:2, pace:1.34, boltAt:16, label:'Storm'  }
+  };
+  let mode = 'round';
+  let diffKey = 'normal';
+  function diff(){ return DIFFS[diffKey]; }
+  function isEndless(){ return mode === 'endless'; }
+  try{
+    const sm = localStorage.getItem('squishMode'); if(DIFFS[localStorage.getItem('squishDiff')]) diffKey = localStorage.getItem('squishDiff');
+    if(sm === 'endless' || sm === 'round') mode = sm;
+  }catch(e){}
 
   let W = 0, H = 0, groundY = 0;
   let picked = 0;
   let player = null, playerShadow = null;
   let px = 0, targetX = 0, keyDir = 0;
   let fallers = [], particles = [];
-  let score = 0, hearts = MAX_HEARTS, timeLeft = ROUND, combo = 0;
+  let score = 0, hearts = 3, timeLeft = ROUND, combo = 0;
   let running = false, lastT = 0, spawnT = 0, elapsed = 0, raf = 0;
   let waveIdx = 0;
   let paused = false;
-  let perk = NO_PERK, maxHearts = MAX_HEARTS, shield = 0, shieldEl = null;
+  let perk = NO_PERK, maxHearts = 3, shield = 0, shieldEl = null;
   let lastPx = 0, trailT = 0;
+  let runCaught = {};
+  let bestCombo = 0, bossCleared = false;
   let bossEl = null, bossState = 'none', bossT = 0, bossX = 0, bossDir = 1, bossShots = 0, bossHurt = false;
   const BOSS_AT = 44, BOSS_SHOTS = 8;
+  let nextBossAt = BOSS_AT;
+
+  /* ---------------- combo + power-ups ---------------- */
+  const COMBO_WINDOW = 3.6;          // seconds to keep a streak alive
+  let comboT = 0;
+  function multiplier(){ return combo >= 20 ? 4 : combo >= 12 ? 3 : combo >= 5 ? 2 : 1; }
+
+  const PW = {
+    magnet: { t:'Magnet',  dur:6.5, col:'#8C6BFF', ico:'<path d="M22 74V44a28 28 0 0 1 56 0v30H60V44a10 10 0 0 0-20 0v30z" fill="#8C6BFF" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><path d="M22 74h18v14H22zM60 74h18v14H60z" fill="#FF4F9A" stroke="#fff" stroke-width="5"/>' },
+    slow:   { t:'Slow-mo', dur:5.5, col:'#2FCBBD', ico:'<circle cx="50" cy="52" r="34" fill="#2FCBBD" stroke="#fff" stroke-width="6"/><path d="M50 32v22l15 10" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/>' },
+    x2:     { t:'Double',  dur:8.0, col:'#FFC53C', ico:'<circle cx="50" cy="50" r="36" fill="#FFC53C" stroke="#fff" stroke-width="6"/><text x="50" y="66" font-family="Baloo 2,sans-serif" font-size="44" font-weight="800" fill="#7A4F00" text-anchor="middle">x2</text>' }
+  };
+  const pw = { magnet:0, slow:0, x2:0 };
+  function pwActive(k){ return pw[k] > 0; }
   const canVibrate = typeof navigator !== 'undefined' && !!navigator.vibrate;
-  function buzz(pattern){ if(canVibrate && !reduceMotion){ try{ navigator.vibrate(pattern); }catch(e){} } }
+  /* Short pulses only. A phone motor can't do "soft", so cuteness comes from
+     brevity and rhythm — anything over ~30ms reads as an alarm. */
+  const HAPTIC = {
+    gift:     [12, 45, 12],        // little double tap
+    block:    [8, 28, 8],
+    comboUp:  [8, 26, 8],
+    rain:     [16],                // one small nudge
+    zap:      [12, 28, 12, 28, 20],// stutter, like a crackle
+    bossWin:  [10, 55, 10, 55, 18],
+    gameOver: [24, 70, 16, 70, 9]  // fading away, not a long buzz
+  };
+  function buzz(pattern){
+    if(!canVibrate || reduceMotion) return;
+    try{ navigator.vibrate(pattern); }catch(e){}
+  }
 
   /* ---------------- time of day ----------------
      the sky drifts from midday to night across the round */
   const SKY = [
     { at:0.00, c:[[143,222,255],[201,236,255],[255,226,241]] },  // bright noon
-    { at:0.42, c:[[127,198,240],[255,217,168],[255,201,160]] },  // golden hour
-    { at:0.72, c:[[ 86,101,168],[176,133,175],[240,166,166]] },  // dusk
+    { at:0.30, c:[[141,219,253],[203,234,250],[255,224,226]] },  // holds midday a while
+    { at:0.58, c:[[127,198,240],[255,217,168],[255,201,160]] },  // golden hour
+    { at:0.80, c:[[ 86,101,168],[176,133,175],[240,166,166]] },  // dusk
     { at:1.00, c:[[ 30, 42, 85],[ 58, 61,114],[107, 90,140]] }   // night
   ];
   function mix(a, b, k){ return [
@@ -618,47 +789,251 @@
 
   /* ---------------- difficulty curve ----------------
      ramp: 0 at kickoff -> 1 by ~46s, so the last stretch is the peak. */
-  function ramp(){ return Math.min(1, elapsed / 46); }
+  function ramp(){
+    const pace = diff().pace;
+    // endless keeps pushing past the round cap, but with diminishing returns
+    const t = elapsed * pace / 46;
+    return isEndless() ? Math.min(1.6, t) : Math.min(1, t);
+  }
+  function boltAt(){ return diff().boltAt + stormDelay(); }
   function stormDelay(){ return perk.storm || 0; }
-  function stormRamp(){ return Math.max(0, Math.min(1, (elapsed - 22 - stormDelay()) / 26)); }
+  function stormRamp(){ return Math.max(0, Math.min(1, (elapsed - boltAt()) / 26)); }
   const WAVES = [
     { at: 14, text: 'Picking up speed!' },
     { at: 26, text: 'Storm rolling in \u26A1' },
     { at: 42, text: 'Final push!' }
   ];
 
-  /* ---------------- sound ---------------- */
+  /* ---------------- sound ----------------
+     Everything is sine and soft triangle, routed through a warm master chain
+     with a short shimmer delay, so the game sounds like little toy chimes
+     instead of a synth test bench. No saw or square waves anywhere. */
   let ac = null, muted = false;
+  let master = null, noiseBuf = null;
+
   function audio(){
-    if(!ac){ try{ ac = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+    if(!ac){
+      try{ ac = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; }
+      buildChain();
+    }
     if(ac.state === 'suspended') ac.resume();
     return ac;
   }
-  function tone(freq, start, dur, type, vol){
-    const a = audio(); if(!a || muted) return;
-    const t0 = a.currentTime + start;
-    const osc = a.createOscillator(), g = a.createGain();
-    osc.type = type || 'triangle';
-    osc.frequency.setValueAtTime(freq, t0);
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol || 0.16, t0 + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(g); g.connect(a.destination);
-    osc.start(t0); osc.stop(t0 + dur + 0.05);
+
+  function buildChain(){
+    master = ac.createGain(); master.gain.value = 0.85;
+
+    // takes the glassy edge off every voice
+    const warm = ac.createBiquadFilter();
+    warm.type = 'lowpass'; warm.frequency.value = 5600; warm.Q.value = 0.5;
+
+    // a quiet, short echo — this is most of what makes small blips sound sweet
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 600;
+    const dl = ac.createDelay(0.6); dl.delayTime.value = 0.115;
+    const fb = ac.createGain(); fb.gain.value = 0.24;
+    const wet = ac.createGain(); wet.gain.value = 0.19;
+
+    master.connect(warm); warm.connect(ac.destination);
+    master.connect(hp); hp.connect(dl);
+    dl.connect(fb); fb.connect(dl);
+    dl.connect(wet); wet.connect(ac.destination);
+
+    // a little noise for soft pops and airy sweeps
+    const n = (ac.sampleRate * 0.5) | 0;
+    noiseBuf = ac.createBuffer(1, n, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let k = 0; k < n; k++) d[k] = Math.random() * 2 - 1;
   }
+
+  /* one round bell-ish voice: sine body, quiet octave on top,
+     optional scoop into the note and gentle vibrato */
+  function blip(freq, at, dur, vol, opt){
+    const a = audio(); if(!a || muted) return;
+    opt = opt || {};
+    const t = a.currentTime + at;
+    const bend = opt.bend === undefined ? 0.75 : opt.bend;
+
+    const osc = a.createOscillator(), g = a.createGain();
+    osc.type = opt.type || 'sine';
+    osc.frequency.setValueAtTime(freq, t);
+    if(opt.to) osc.frequency.exponentialRampToValueAtTime(Math.max(30, opt.to), t + dur * bend);
+
+    if(opt.vib){
+      const lfo = a.createOscillator(), lg = a.createGain();
+      lfo.frequency.value = opt.vib;
+      lg.gain.value = freq * 0.02;
+      lfo.connect(lg); lg.connect(osc.frequency);
+      lfo.start(t); lfo.stop(t + dur + 0.06);
+    }
+
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + (opt.attack || 0.012));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g); g.connect(master);
+    osc.start(t); osc.stop(t + dur + 0.07);
+
+    // the octave is what reads as "toy xylophone" rather than "beep"
+    if(opt.harm !== 0){
+      const o2 = a.createOscillator(), g2 = a.createGain();
+      o2.type = 'sine';
+      o2.frequency.setValueAtTime(freq * 2, t);
+      if(opt.to) o2.frequency.exponentialRampToValueAtTime(Math.max(60, opt.to * 2), t + dur * bend);
+      g2.gain.setValueAtTime(0.0001, t);
+      g2.gain.exponentialRampToValueAtTime(vol * 0.28, t + 0.009);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.5);
+      o2.connect(g2); g2.connect(master);
+      o2.start(t); o2.stop(t + dur + 0.07);
+    }
+  }
+
+  /* soft airy transient — the squish, the puff, the whoosh */
+  function puff(at, dur, vol, f0, f1){
+    const a = audio(); if(!a || muted || !noiseBuf) return;
+    const t = a.currentTime + at;
+    const src = a.createBufferSource(); src.buffer = noiseBuf;
+    const bp = a.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(f0, t);
+    bp.frequency.exponentialRampToValueAtTime(Math.max(60, f1), t + dur);
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.014);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp); bp.connect(g); g.connect(master);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
+
+  // kept for the results screen's star pings
+  function tone(freq, start, dur, type, vol){ blip(freq, start, dur, vol || 0.12, { type:'sine' }); }
+
+  // C major pentatonic — every catch lands on a consonant note, so a fast
+  // chain of them sounds like a little tune instead of a rattle
+  const PENTA = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66, 1318.51];
+
   const sfx = {
-    catch(c){ const base = 520 + Math.min(c,8)*40; tone(base,0,.11,'triangle',.16); tone(base*1.5,.055,.12,'sine',.11); },
-    star(){ [660,830,990,1320].forEach((f,i)=>tone(f,i*.055,.16,'sine',.14)); },
-    bad(){ tone(220,0,.16,'sawtooth',.10); tone(150,.1,.22,'sawtooth',.09); },
-    tick(){ tone(700,0,.09,'square',.09); },
-    go(){ [520,660,880].forEach((f,i)=>tone(f,i*.07,.2,'triangle',.16)); },
-    tap(){ tone(880,0,.07,'sine',.10); },
-    zap(){ tone(1100,0,.05,'sawtooth',.12); tone(180,.04,.3,'sawtooth',.13); },
-    wave(){ [440,588,740].forEach((f,i)=>tone(f,i*.06,.24,'triangle',.13)); },
-    whoosh(){ tone(340,0,.13,'sine',.07); tone(210,.05,.14,'sine',.05); },
-    shield(){ [520,760,1040].forEach((f,i)=>tone(f,i*.04,.22,'sine',.13)); },
-    fanfare(){ [523,659,784,1047,1319].forEach((f,i)=>tone(f,i*.11,.36,'triangle',.15)); }
+    // the sound you hear hundreds of times a round: soft marimba boop that
+    // climbs the scale as your streak grows
+    catch(c){
+      const f = PENTA[Math.min(Math.max(c, 1) - 1, PENTA.length - 1)];
+      puff(0, 0.055, 0.085, 1900, 700);
+      blip(f * 0.94, 0, 0.26, 0.115, { to: f, bend: 0.10 });
+      blip(f * 1.5, 0.035, 0.16, 0.045, { harm: 0 });
+    },
+    // hitting a new multiplier tier
+    comboUp(m){
+      const base = 659.25 * Math.pow(1.1225, m);
+      [0, 4, 7].forEach(function(st, i){
+        blip(base * Math.pow(2, st / 12), i * 0.045, 0.34, 0.10, { vib: 6 });
+      });
+    },
+    star(){
+      [1046.50, 1318.51, 1567.98, 2093.00].forEach(function(f, i){
+        blip(f, i * 0.055, 0.42 - i * 0.05, 0.105 - i * 0.012, { attack: 0.006 });
+      });
+      puff(0.02, 0.3, 0.065, 4200, 1400);
+    },
+    // a small disappointed "aww", not a buzz
+    bad(){
+      puff(0, 0.13, 0.105, 700, 220);
+      blip(392.00, 0,     0.30, 0.115, { to: 349.23, type:'triangle', vib: 7 });
+      blip(311.13, 0.145, 0.38, 0.100, { to: 277.18, type:'triangle', vib: 6 });
+    },
+    // lightning: a quick startled swoop plus a crackle, still soft
+    zap(){
+      puff(0, 0.17, 0.145, 3200, 500);
+      blip(880, 0, 0.22, 0.110, { to: 220, bend: 0.45, type:'triangle' });
+      blip(261.63, 0.11, 0.34, 0.080, { vib: 11, type:'triangle' });
+    },
+    tick(){
+      puff(0, 0.030, 0.105, 2800, 1700);
+      blip(1318.51, 0, 0.07, 0.075, { harm: 0 });
+    },
+    go(){
+      [523.25, 659.25, 783.99].forEach(function(f, i){ blip(f, i * 0.075, 0.24, 0.12); });
+      blip(1046.50, 0.225, 0.55, 0.13, { vib: 5 });
+    },
+    tap(){
+      puff(0, 0.045, 0.08, 2400, 950);
+      blip(698.46, 0, 0.10, 0.085, { to: 1174.66, bend: 0.45 });
+    },
+    // near miss — pure air, no pitch, so it never competes with the music
+    whoosh(){ puff(0, 0.26, 0.20, 420, 2600); blip(392, 0.02, 0.2, 0.03, { to: 660, harm: 0 }); },
+    // power-up / shield: a rising sparkle
+    shield(){
+      [783.99, 1046.50, 1318.51].forEach(function(f, i){
+        blip(f, i * 0.045, 0.36 - i * 0.04, 0.10, { to: f * 1.06, bend: 0.7 });
+      });
+      puff(0, 0.18, 0.065, 1600, 4000);
+    },
+    wave(){
+      blip(659.25, 0,     0.20, 0.11);
+      blip(880.00, 0.135, 0.46, 0.12, { vib: 5 });
+    },
+    // a proper little tune rather than a run up the scale
+    fanfare(){
+      const mel = [[783.99,0,.15],[1046.50,.13,.15],[987.77,.26,.13],[1318.51,.38,.62]];
+      mel.forEach(function(n, i){ blip(n[0], n[1], n[2], 0.125, i === 3 ? { vib: 5.5 } : {}); });
+      [[261.63,0,.5],[329.63,.13,.5],[392.00,.26,.62]].forEach(function(n){
+        blip(n[0], n[1], n[2], 0.055, { type:'triangle', harm: 0 });
+      });
+    }
   };
+
+  /* ---------------- music ----------------
+     a small procedural loop that tightens its tempo as the storm builds */
+  const SCALE_DAY   = [0, 2, 4, 7, 9, 12, 14, 16];
+  const SCALE_NIGHT = [0, 3, 5, 7, 10, 12, 15, 17];
+  const ROOT = 261.63;                       // C4
+  let musicTimer = null, nextNote = 0, step = 0;
+
+  function noteHz(semis){ return ROOT * Math.pow(2, semis / 12); }
+
+  function voice(freq, at, dur, vol, type){
+    const a = audio(); if(!a || muted) return;
+    const osc = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
+    osc.type = type || 'triangle';
+    osc.frequency.setValueAtTime(freq, at);
+    f.type = 'lowpass'; f.frequency.setValueAtTime(2200, at);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(vol, at + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    osc.connect(f); f.connect(g); g.connect(master || a.destination);
+    osc.start(at); osc.stop(at + dur + 0.04);
+  }
+
+  function scheduleMusic(){
+    const a = audio(); if(!a) return;
+    const heat = Math.max(0, Math.min(1, ramp()));
+    const dark = stormRamp();
+    const scale = dark > 0.35 ? SCALE_NIGHT : SCALE_DAY;
+    const stepDur = 0.30 - 0.115 * heat;     // speeds up across the round
+    while(nextNote < a.currentTime + 0.35){
+      const at = Math.max(nextNote, a.currentTime + 0.02);
+      const i = step % 8;
+      // arpeggio up and back down
+      const idx = i < 5 ? i : 8 - i;
+      voice(noteHz(scale[idx] + 12), at, stepDur * 1.5, 0.045 + 0.02 * heat, 'triangle');
+      if(i % 4 === 0){
+        voice(noteHz(scale[0] - 12), at, stepDur * 3.2, 0.05, 'sine');
+      }
+      if(i === 6 && dark > 0.5){
+        voice(noteHz(scale[2] - 5), at, stepDur * 2, 0.035, 'sawtooth');
+      }
+      nextNote += stepDur;
+      step++;
+    }
+  }
+
+  function startMusic(){
+    const a = audio(); if(!a) return;
+    stopMusic();
+    step = 0;
+    nextNote = a.currentTime + 0.1;
+    musicTimer = setInterval(scheduleMusic, 90);
+    scheduleMusic();
+  }
+  function stopMusic(){ if(musicTimer){ clearInterval(musicTimer); musicTimer = null; } }
 
   /* ---------------- layout ---------------- */
   function resize(){
@@ -707,12 +1082,107 @@
     buddyGrid.appendChild(b);
   });
 
-  function show(el){ [screenTitle, screenPick, screenOver].forEach(function(s){ s.classList.add('hidden'); }); if(el) el.classList.remove('hidden'); }
+  function show(el){ [screenTitle, screenPick, screenOver, screenBoard, screenSquad].forEach(function(s){ s.classList.add('hidden'); }); if(el) el.classList.remove('hidden'); }
 
   document.getElementById('toPickBtn').addEventListener('click', function(){ audio(); sfx.tap(); show(screenPick); });
   document.getElementById('startBtn').addEventListener('click', function(){ sfx.tap(); begin(); });
   document.getElementById('againBtn').addEventListener('click', function(){ sfx.tap(); begin(); });
   document.getElementById('rePickBtn').addEventListener('click', function(){ sfx.tap(); show(screenPick); });
+  /* mode + difficulty pickers */
+  function wireSeg(id, attr, get, set){
+    const root = document.getElementById(id);
+    [].forEach.call(root.children, function(b){
+      b.classList.toggle('sel', b.dataset[attr] === get());
+      b.addEventListener('click', function(){
+        set(b.dataset[attr]);
+        [].forEach.call(root.children, function(x){ x.classList.remove('sel'); });
+        b.classList.add('sel');
+        sfx.tap();
+      });
+    });
+  }
+  wireSeg('modeSeg', 'mode', function(){ return mode; }, function(v){
+    mode = v; try{ localStorage.setItem('squishMode', v); }catch(e){}
+  });
+  wireSeg('diffSeg', 'diff', function(){ return diffKey; }, function(v){
+    diffKey = v; try{ localStorage.setItem('squishDiff', v); }catch(e){}
+  });
+
+  /* ---------------- best runs ---------------- */
+  function loadBoard(){
+    try{ return JSON.parse(localStorage.getItem('squishBoard') || '[]') || []; }catch(e){ return []; }
+  }
+  function saveRun(entry){
+    const b = loadBoard();
+    b.push(entry);
+    b.sort(function(x, y){ return y.score - x.score; });
+    const top = b.slice(0, 5);
+    try{ localStorage.setItem('squishBoard', JSON.stringify(top)); }catch(e){}
+    return top.indexOf(entry);
+  }
+  function renderBoard(){
+    const list = document.getElementById('boardList');
+    const b = loadBoard();
+    list.innerHTML = '';
+    if(!b.length){
+      list.innerHTML = '<li class="empty">No runs yet — go catch some friends!</li>';
+      return;
+    }
+    b.forEach(function(e){
+      const c = CHARS[e.ci] || CHARS[0];
+      const li = document.createElement('li');
+      li.innerHTML = '<img src="' + c.src + '" alt=""><span>' + c.name +
+        '<small>' + (e.mode === 'endless' ? 'Endless' : '60s') + ' · ' + (DIFFS[e.diff] ? DIFFS[e.diff].label : 'Normal') +
+        ' · ' + e.date + '</small></span><b>' + e.score + '</b>';
+      list.appendChild(li);
+    });
+  }
+  document.getElementById('boardBtn').addEventListener('click', function(){ sfx.tap(); renderBoard(); show(screenBoard); });
+  document.getElementById('boardBackBtn').addEventListener('click', function(){ sfx.tap(); show(screenTitle); });
+
+  /* ---------------- squad book + badges ---------------- */
+  const BADGES = [
+    { id:'flawless', t:'Untouchable', d:'Finish a round without losing a heart', ico:'\u2764\uFE0F' },
+    { id:'streak10', t:'On a roll',   d:'Catch 10 friends in a row',             ico:'\u26A1' },
+    { id:'storm',    t:'Storm rider', d:'Survive the boss storm untouched',      ico:'\u26C8\uFE0F' },
+    { id:'score50',  t:'Half century',d:'Score 50 in one run',                   ico:'\u2B50' },
+    { id:'allten',   t:'Full squad',  d:'Catch every buddy at least once',       ico:'\uD83C\uDFC6' },
+    { id:'endless60',t:'Marathon',    d:'Last 60 seconds in Endless',            ico:'\u23F1\uFE0F' }
+  ];
+  function loadJSON(key, fallback){
+    try{ return JSON.parse(localStorage.getItem(key) || 'null') || fallback; }catch(e){ return fallback; }
+  }
+  function saveJSON(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }catch(e){} }
+  let squad = loadJSON('squishSquad', {});
+  let badges = loadJSON('squishBadges', {});
+
+  function renderSquad(){
+    const grid = document.getElementById('squadGrid');
+    grid.innerHTML = '';
+    CHARS.forEach(function(c, i){
+      const n = squad[i] || 0;
+      const d = document.createElement('div');
+      d.className = 'sq' + (n ? '' : ' locked');
+      d.innerHTML = '<img src="' + c.src + '" alt=""><span>' + c.name + '</span><b>' + (n ? n + ' caught' : 'not yet') + '</b>';
+      grid.appendChild(d);
+    });
+    const brow = document.getElementById('badgeRow');
+    brow.innerHTML = '';
+    BADGES.forEach(function(b){
+      const got = !!badges[b.id];
+      const d = document.createElement('div');
+      d.className = 'bdg' + (got ? ' got' : '');
+      d.innerHTML = '<span class="ico">' + b.ico + '</span><span>' + b.t + '<small>' + b.d + '</small></span>';
+      brow.appendChild(d);
+    });
+    const total = CHARS.reduce(function(a, c, i){ return a + (squad[i] || 0); }, 0);
+    const found = CHARS.filter(function(c, i){ return squad[i]; }).length;
+    document.getElementById('squadTally').textContent =
+      found + ' of ' + CHARS.length + ' buddies met  \u00B7  ' + total + ' caught in all';
+  }
+  document.getElementById('squadBtn').addEventListener('click', function(){ sfx.tap(); renderSquad(); show(screenSquad); });
+  document.getElementById('squadBackBtn').addEventListener('click', function(){ sfx.tap(); show(screenTitle); });
+
   /* flash preference (persisted) */
   const flashOpt = document.getElementById('flashOpt');
   let noFlash = false;
@@ -728,6 +1198,7 @@
   document.getElementById('muteBtn').addEventListener('click', function(){
     muted = !muted;
     this.textContent = muted ? '🔇' : '🔊';
+    if(muted) stopMusic(); else if(running) startMusic();
     if(!muted) sfx.tap();
   });
 
@@ -748,18 +1219,25 @@
     stage.innerHTML = '';
     fallers = []; particles = [];
     perk = perkOf(picked);
-    maxHearts = MAX_HEARTS + (perk.hearts || 0);
+    maxHearts = diff().hearts + (perk.hearts || 0);
     shield = perk.shield ? 1 : 0;
     score = 0; hearts = maxHearts; timeLeft = ROUND; combo = 0; elapsed = 0; spawnT = 0;
     waveIdx = 0; paused = false; trailT = 0;
+    combo = 0; comboT = 0; bestCombo = 0; bossCleared = false;
+    pw.magnet = 0; pw.slow = 0; pw.x2 = 0;
+    runCaught = {};
+    comboPill.classList.remove('on');
+    pwRow.innerHTML = '';
     bossState = 'none'; bossT = 0; bossShots = 0; bossHurt = false;
+    nextBossAt = isEndless() ? 32 : BOSS_AT;
     if(bossEl){ bossEl.remove(); bossEl = null; }
     resetSky();
     pauseEl.classList.add('hidden');
     stormEl.style.opacity = 0;
     waveEl.classList.remove('go');
     scoreVal.textContent = '0';
-    timeVal.textContent = ROUND;
+    timeVal.textContent = isEndless() ? 0 : ROUND;
+    document.querySelector('#timePill .cap').textContent = isEndless() ? 'Survived' : 'Time';
     timePill.classList.remove('low');
     drawHearts();
     hud.classList.remove('hidden');
@@ -796,6 +1274,7 @@
         running = true;
         app.classList.add('playing');
         lastT = performance.now();
+        startMusic();
         raf = requestAnimationFrame(loop);
       }
     }, 750);
@@ -806,11 +1285,13 @@
     if(on && running){
       paused = true; running = false;
       cancelAnimationFrame(raf);
+      stopMusic();
       pauseEl.classList.remove('hidden');
       app.classList.remove('playing');
     } else if(!on && paused){
       paused = false; running = true;
       pauseEl.classList.add('hidden');
+      startMusic();
       app.classList.add('playing');
       lastT = performance.now();
       raf = requestAnimationFrame(loop);
@@ -827,6 +1308,25 @@
     }
   });
   window.addEventListener('blur', function(){ if(running) setPaused(true); });
+
+  function drawCombo(){
+    const m = multiplier();
+    if(m <= 1 || !running && combo === 0){ comboPill.classList.remove('on'); return; }
+    if(!comboPill.classList.contains('on')){ comboPill.classList.add('on'); }
+    comboVal.textContent = 'x' + m;
+    comboBarFill.style.width = Math.max(0, Math.min(1, comboT / COMBO_WINDOW) * 100) + '%';
+  }
+
+  function drawPowerUps(){
+    pwRow.innerHTML = '';
+    Object.keys(PW).forEach(function(k){
+      if(pw[k] <= 0) return;
+      const d = document.createElement('div');
+      d.className = 'pw';
+      d.innerHTML = '<svg viewBox="0 0 100 100">' + PW[k].ico + '</svg>' + Math.ceil(pw[k]);
+      pwRow.appendChild(d);
+    });
+  }
 
   function drawHearts(){
     heartsEl.innerHTML = '';
@@ -852,15 +1352,27 @@
 
     // hazard mix widens as the round goes on
     const starC = 0.07;
-    const boltC = elapsed > 22 + stormDelay() ? 0.03 + 0.11 * stormRamp() : 0;
+    const boltC = elapsed > boltAt() ? 0.03 + 0.11 * stormRamp() : 0;
     const rainC = (elapsed > 5 ? 0.06 + 0.19 * d : 0) * (perk.rain || 1);
+
+    // power-ups start showing up once the round has warmed up
+    const pwC = elapsed > 9 ? 0.055 : 0;
 
     let kind = 'friend';
     if(r < starC) kind = 'star';
     else if(r < starC + boltC) kind = 'bolt';
     else if(r < starC + boltC + rainC) kind = 'rain';
+    else if(r < starC + boltC + rainC + pwC) kind = pickPowerUp();
 
     spawnAt(kind, s/2 + Math.random() * Math.max(1, W - s), s);
+  }
+
+  function isGift(k){ return k === 'pheart' || k === 'pshield' || k === 'magnet' || k === 'slow' || k === 'x2'; }
+
+  function pickPowerUp(){
+    const pool = ['magnet','slow','x2','pshield'];
+    if(hearts < maxHearts) pool.push('pheart','pheart');   // hearts only drop when you need one
+    return pool[(Math.random() * pool.length) | 0];
   }
 
   function spawnAt(kind, atX, s){
@@ -870,14 +1382,24 @@
     el.style.width = s + 'px';
     el.style.height = s + 'px';
 
+    let ci = -1;
     if(kind === 'friend'){
-      const c = CHARS[(Math.random() * CHARS.length) | 0];
-      el.innerHTML = '<div class="art"><img src="' + c.src + '" alt=""></div>';
+      ci = (Math.random() * CHARS.length) | 0;
+      el.innerHTML = '<div class="art"><img src="' + CHARS[ci].src + '" alt=""></div>';
     } else if(kind === 'star'){
       el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%;filter:drop-shadow(0 0 10px rgba(255,197,60,.9))">' +
         '<path d="M50 6l12.6 25.6 28.3 4.1-20.5 20 4.9 28.2L50 70.6 24.7 83.9l4.9-28.2-20.5-20 28.3-4.1z" fill="#FFC53C" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>' +
         '<circle cx="40" cy="45" r="4.2" fill="#4B2A55"/><circle cx="60" cy="45" r="4.2" fill="#4B2A55"/>' +
         '<path d="M42 56c3 4 13 4 16 0" stroke="#4B2A55" stroke-width="4" fill="none" stroke-linecap="round"/></svg></div>';
+    } else if(kind === 'pheart' || kind === 'pshield' || kind === 'magnet' || kind === 'slow' || kind === 'x2'){
+      const art =
+        kind === 'pheart'  ? '<path d="M50 84S16 62 16 40a17 17 0 0 1 34-8 17 17 0 0 1 34 8c0 22-34 44-34 44z" fill="#FF4F9A" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>' :
+        kind === 'pshield' ? '<path d="M50 14l30 12v24c0 20-13 32-30 38-17-6-30-18-30-38V26z" fill="#78DEFF" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>' :
+        PW[kind].ico;
+      const glow = kind === 'pheart' ? '#FF4F9A' : kind === 'pshield' ? '#78DEFF' : PW[kind].col;
+      el.classList.add('gift');
+      el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%;filter:drop-shadow(0 0 11px ' + glow + ')">' +
+        '<circle cx="50" cy="50" r="46" fill="rgba(255,255,255,.34)" stroke="#fff" stroke-width="4"/>' + art + '</svg></div>';
     } else if(kind === 'bolt'){
       el.classList.add('bolt');
       el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%">' +
@@ -894,11 +1416,12 @@
     }
 
     const f = {
-      el: el, kind: kind, size: s,
+      el: el, kind: kind, size: s, ci: ci,
       x: atX,
       y: -s,
       vy: (118 + 252 * d + Math.random() * (40 + 40 * d))
           * (kind === 'bolt' ? 1.5 * (perk.bolt || 1) : 1)
+          * (isGift(kind) ? 0.72 : 1)
           * (perk.fall || 1),
       sway: (Math.random() * 2 - 1) * (kind === 'bolt' ? 10 : 20 + 26 * d),
       phase: Math.random() * 6.28,
@@ -938,7 +1461,7 @@
     stage.appendChild(bossEl);
     waveEl.textContent = 'Big storm incoming!';
     waveEl.classList.remove('go'); void waveEl.offsetWidth; waveEl.classList.add('go');
-    sfx.wave(); buzz(25);
+    sfx.wave(); buzz(HAPTIC.gift);
   }
 
   function bossShoot(){
@@ -950,8 +1473,9 @@
   }
 
   function stepBoss(dt){
-    if(bossState === 'none'){
-      if(elapsed >= BOSS_AT && timeLeft > 9){ startBoss(); }
+    if(bossState === 'none' || bossState === 'done'){
+      const room = isEndless() || timeLeft > 9;
+      if(elapsed >= nextBossAt && room){ startBoss(); }
       return;
     }
     if(bossState === 'done' || !bossEl) return;
@@ -978,11 +1502,12 @@
         bossState = 'leave';
         bossEl.classList.remove('charging');
         if(!bossHurt){
+          bossCleared = true;
           score += 15;
           scoreVal.textContent = score;
           floatText('storm survived! +15', W/2, H*0.34, 'star');
           waveEl.textContent = 'Storm survived! +15';
-          sfx.star(); buzz([20,40,20]);
+          sfx.star(); buzz(HAPTIC.bossWin);
         } else {
           waveEl.textContent = 'Storm passed';
           sfx.wave();
@@ -994,6 +1519,7 @@
       bossEl.style.opacity = 0;
       if(bossX < -bs || bossX > W + bs){
         bossEl.remove(); bossEl = null; bossState = 'done';
+        nextBossAt = elapsed + (isEndless() ? 34 : 1e9);
         return;
       }
     }
@@ -1050,15 +1576,42 @@
     el.classList.add('pop');
     setTimeout(function(){ el.remove(); }, 340);
 
+    if(isGift(f.kind)){
+      ripple(cx, cy, f.size * 1.4, 'rgba(255,255,255,.95)');
+      if(f.kind === 'pheart'){
+        hearts = Math.min(maxHearts, hearts + 1);
+        drawHearts();
+        floatText('+1 heart', cx, cy);
+        burst(cx, cy, ['#FF4F9A','#FFB3D4','#FFF'], 22);
+      } else if(f.kind === 'pshield'){
+        shield = 1;
+        if(!shieldEl && player){
+          shieldEl = document.createElement('div');
+          shieldEl.id = 'shieldRing';
+          player.appendChild(shieldEl);
+        }
+        floatText('shield!', cx, cy, 'close');
+        burst(cx, cy, ['#78DEFF','#D6F5FF','#FFF'], 22);
+      } else {
+        pw[f.kind] = PW[f.kind].dur;
+        floatText(PW[f.kind].t + '!', cx, cy, 'star');
+        burst(cx, cy, [PW[f.kind].col,'#FFF'], 22);
+      }
+      drawPowerUps();
+      player.classList.remove('squish'); void player.offsetWidth; player.classList.add('squish');
+      sfx.shield(); buzz(HAPTIC.gift);
+      return;
+    }
+
     if(f.kind === 'bolt' || f.kind === 'rain'){
       if(shield){
         shield = 0;
         if(shieldEl){ shieldEl.classList.add('pop'); const se = shieldEl; shieldEl = null; setTimeout(function(){ se.remove(); }, 420); }
-        combo = 0;
+        combo = 0; comboT = 0; drawCombo();
         floatText('blocked!', cx, cy, 'close');
         ripple(cx, cy, f.size * 1.5, 'rgba(120,222,255,.95)');
         burst(cx, cy, ['#78DEFF','#D6F5FF','#FFF'], 20);
-        sfx.shield(); buzz(18);
+        sfx.shield(); buzz(HAPTIC.block);
         return;
       }
     }
@@ -1066,13 +1619,13 @@
     if(f.kind === 'bolt'){
       hearts = Math.max(0, hearts - 1);
       if(bossState === 'fight' || bossState === 'enter') bossHurt = true;
-      combo = 0;
+      combo = 0; comboT = 0; drawCombo();
       drawHearts();
       if(!reduceMotion && !noFlash){ flashEl.classList.remove('zap'); void flashEl.offsetWidth; flashEl.classList.add('zap'); }
       player.classList.remove('ouch'); void player.offsetWidth; player.classList.add('ouch');
       floatText('zap!', cx, cy, 'zap');
       burst(cx, cy, ['#FFD84D','#FFF3B8','#6B7C90','#FFF'], 20);
-      shake(); buzz([40,45,55]);
+      shake(); buzz(HAPTIC.zap);
       sfx.zap();
       if(hearts === 0) finish();
       return;
@@ -1081,12 +1634,12 @@
     if(f.kind === 'rain'){
       hearts = Math.max(0, hearts - 1);
       if(bossState === 'fight' || bossState === 'enter') bossHurt = true;
-      combo = 0;
+      combo = 0; comboT = 0; drawCombo();
       drawHearts();
       player.classList.remove('ouch'); void player.offsetWidth; player.classList.add('ouch');
       floatText('oops!', cx, cy, 'bad');
       burst(cx, cy, ['#9FB4C6','#7FC7E8','#D9EAF5'], 14);
-      shake(); buzz(35);
+      shake(); buzz(HAPTIC.rain);
       sfx.bad();
       if(hearts === 0) finish();
       return;
@@ -1096,19 +1649,29 @@
 
     ripple(cx, cy, f.size * 1.25);
 
+    const wasM = multiplier();
+    combo++;
+    if(combo > bestCombo) bestCombo = combo;
+    comboT = COMBO_WINDOW;
+    const tier = multiplier();
+    if(tier > wasM){ sfx.comboUp(tier); buzz(HAPTIC.comboUp); }
+    const m = tier * (pwActive('x2') ? 2 : 1);
+
     if(f.kind === 'star'){
-      const sv = perk.star || 5;
-      score += sv; combo++;
+      const sv = (perk.star || 5) * m;
+      score += sv;
       floatText('+' + sv, cx, cy, 'star');
       burst(cx, cy, ['#FFC53C','#FFE9A8','#FFF','#FF4F9A'], 26);
       sfx.star();
     } else {
-      score += 1; combo++;
-      floatText(combo >= 5 ? 'squishy! +1' : '+1', cx, cy);
+      score += m;
+      floatText(m > 1 ? '+' + m + '  x' + m : '+1', cx, cy);
       burst(cx, cy, ['#FF4F9A','#2FCBBD','#FFC53C','#8C6BFF','#FFF'], 16);
       sfx.catch(combo);
+      if(f.ci >= 0) runCaught[f.ci] = (runCaught[f.ci] || 0) + 1;
     }
     scoreVal.textContent = score;
+    drawCombo();
   }
 
   function loop(now){
@@ -1118,15 +1681,20 @@
     if(dt > 0.05) dt = 0.05;
     elapsed += dt;
 
-    // timer
-    const prev = Math.ceil(timeLeft);
-    timeLeft -= dt;
-    const cur = Math.max(0, Math.ceil(timeLeft));
-    if(cur !== prev){
-      timeVal.textContent = cur;
-      if(cur <= 10){ timePill.classList.add('low'); if(cur > 0) sfx.tick(); }
+    // timer — counts down in a round, counts up in endless
+    if(isEndless()){
+      const cur = Math.floor(elapsed);
+      if(cur !== Math.floor(elapsed - dt)) timeVal.textContent = cur;
+    } else {
+      const prev = Math.ceil(timeLeft);
+      timeLeft -= dt;
+      const cur = Math.max(0, Math.ceil(timeLeft));
+      if(cur !== prev){
+        timeVal.textContent = cur;
+        if(cur <= 10){ timePill.classList.add('low'); if(cur > 0) sfx.tick(); }
+      }
+      if(timeLeft <= 0){ finish(); return; }
     }
-    if(timeLeft <= 0){ finish(); return; }
 
     // player
     const spd = perk.speed || 1;
@@ -1152,9 +1720,37 @@
     lastPx = px;
 
     // spawn
+    // combo decays if you stop catching
+    if(combo > 0){
+      comboT -= dt;
+      if(comboT <= 0){ combo = 0; comboT = 0; }
+      drawCombo();
+    }
+
+    // power-up timers
+    let pwChanged = false;
+    for(const k in pw){
+      if(pw[k] > 0){
+        const was = Math.ceil(pw[k]);
+        pw[k] = Math.max(0, pw[k] - dt);
+        if(Math.ceil(pw[k]) !== was) pwChanged = true;
+      }
+    }
+    if(pwChanged) drawPowerUps();
+
     // sky drifts toward night (repainted a few times a second, not every frame)
     skyT -= dt;
-    if(skyT <= 0){ skyT = 0.2; paintSky(Math.min(1, elapsed / ROUND)); }
+    if(skyT <= 0){
+      skyT = 0.2;
+      let t;
+      if(isEndless()){
+        const cyc = (elapsed / 78) % 2;          // a full day/night cycle every 156s
+        t = cyc > 1 ? 2 - cyc : cyc;
+      } else {
+        t = Math.min(1, elapsed / ROUND);
+      }
+      paintSky(t);
+    }
 
     // the boss owns the sky while it is up
     stepBoss(dt);
@@ -1185,13 +1781,17 @@
       const f = fallers[i];
       if(!f){ continue; }
       if(f.dead){ fallers.splice(i,1); continue; }
-      f.y += f.vy * dt;
+      f.y += f.vy * dt * (pwActive('slow') ? 0.5 : 1);
       const wob = Math.sin(elapsed * 1.7 + f.phase) * f.sway;
       const dx = f.x + wob - f.size/2;
       f.el.style.transform = 'translate(' + dx + 'px,' + (f.y - f.size/2) + 'px)';
 
-      // Jelly Pull: nearby friends drift toward the buddy
-      if(perk.pull && f.kind === 'friend'){
+      // magnet power-up sweeps everything friendly toward you; Jelly Pull is the gentler perk
+      const wantPull = (f.kind === 'friend' || f.kind === 'star' || isGift(f.kind));
+      if(wantPull && pwActive('magnet')){
+        const gap = pcx - f.x;
+        f.x += Math.sign(gap) * Math.min(Math.abs(gap), 420 * dt);
+      } else if(perk.pull && f.kind === 'friend'){
         const gap = pcx - f.x;
         if(Math.abs(gap) < ps * 2.4 && f.y > pcy - H * 0.42){
           f.x += Math.sign(gap) * Math.min(Math.abs(gap), 190 * dt);
@@ -1223,7 +1823,10 @@
         continue;
       }
       if(f.y - f.size/2 > H + 20){
-        if(f.kind === 'friend') combo = 0;
+        // a friend slipping past no longer breaks the streak — with several
+        // falling at once that made the multiplier unreachable. The streak now
+        // lives on the catch timer and breaks only when you take damage.
+        if(f.kind === 'friend' && combo > 0) comboT = Math.min(comboT, 1.6);
         f.el.remove();
         fallers.splice(i,1);
       }
@@ -1276,6 +1879,7 @@
 
   function finish(){
     running = false;
+    stopMusic();
     app.classList.remove('playing');
     cancelAnimationFrame(raf);
     fallers.forEach(function(f){ f.el.remove(); });
@@ -1284,31 +1888,72 @@
     bossState = 'none';
     resetSky();
     hud.classList.add('hidden');
+    comboPill.classList.remove('on');
+    pwRow.innerHTML = '';
+    pw.magnet = 0; pw.slow = 0; pw.x2 = 0;
     paused = false;
     pauseEl.classList.add('hidden');
     world.classList.remove('shake');
-    if(hearts === 0) buzz([60,60,120]);
+    if(hearts === 0) buzz(HAPTIC.gameOver);
     stormEl.style.opacity = 0;
     waveEl.classList.remove('go');
     if(player) player.remove();
     if(playerShadow) playerShadow.remove();
+
+    // fold this run into the squad book
+    for(const k in runCaught) squad[k] = (squad[k] || 0) + runCaught[k];
+    saveJSON('squishSquad', squad);
+
+    // badges
+    const earned = [];
+    function award(id){ if(!badges[id]){ badges[id] = 1; earned.push(id); } }
+    if(hearts === maxHearts && score > 0) award('flawless');
+    if(bestCombo >= 10) award('streak10');
+    if(bossCleared) award('storm');
+    if(score >= 50) award('score50');
+    if(CHARS.every(function(c, i){ return squad[i]; })) award('allten');
+    if(isEndless() && elapsed >= 60) award('endless60');
+    if(earned.length) saveJSON('squishBadges', badges);
+
+    // leaderboard
+    let rank = -1;
+    if(score > 0){
+      rank = saveRun({
+        score: score, ci: picked, mode: mode, diff: diffKey,
+        date: new Date().toLocaleDateString(undefined, { month:'short', day:'numeric' })
+      });
+    }
 
     let best = 0;
     try{ best = parseInt(localStorage.getItem('squishBest') || '0', 10) || 0; }catch(e){}
     const isBest = score > best;
     if(isBest){ try{ localStorage.setItem('squishBest', String(score)); }catch(e){} best = score; }
 
-    const tier = score >= 38 ? 3 : score >= 22 ? 2 : score >= 9 ? 1 : 0;
+    const goal = isEndless() ? [9, 22, 40] : [9, 22, 38];
+    const tier = score >= goal[2] ? 3 : score >= goal[1] ? 2 : score >= goal[0] ? 1 : 0;
     const titles = ['Nice try, squishy!', 'Good catching!', 'Super squisher!', 'Squish Squad champion!'];
     const eyebrows = ['Round over', 'Round over', 'Wow', 'Legendary'];
 
     document.getElementById('overBuddy').src = CHARS[picked].src;
     document.getElementById('overTitle').textContent = titles[tier];
-    document.getElementById('overEyebrow').textContent = hearts === 0 ? 'Out of hearts!' : eyebrows[tier];
+    document.getElementById('overEyebrow').textContent = hearts === 0 ? 'Out of hearts!'
+      : isEndless() ? 'Lasted ' + Math.floor(elapsed) + 's' : eyebrows[tier];
     document.getElementById('finalScore').textContent = score;
-    document.getElementById('bestLine').textContent = isBest && score > 0
-      ? '🎉 New best score!'
-      : 'Points  •  Best: ' + best;
+
+    let line;
+    if(earned.length){
+      const b = BADGES.filter(function(x){ return x.id === earned[0]; })[0];
+      line = b.ico + ' New badge: ' + b.t + (earned.length > 1 ? ' +' + (earned.length - 1) + ' more' : '');
+    } else if(isBest && score > 0){
+      line = '\uD83C\uDF89 New best score!';
+    } else if(rank === 0){
+      line = '\uD83C\uDFC5 Top run!';
+    } else if(rank > 0){
+      line = 'Points  \u2022  #' + (rank + 1) + ' of your best 5';
+    } else {
+      line = 'Points  \u2022  Best: ' + best;
+    }
+    document.getElementById('bestLine').textContent = line;
 
     const row = document.getElementById('starRow');
     row.innerHTML = '';
