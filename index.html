@@ -24,6 +24,20 @@
 <meta name="twitter:image" content="og.png">
 <title>Squish Squad Catch</title>
 <script>
+/* Vercel Web Analytics. Cookieless page-view counting served from a first-party
+   path, so no third-party domain and nothing for ad blockers to strip. The queue
+   shim lets window.va be called before the script finishes loading.
+   Only injected over http(s): opened as a local file there is no /_vercel route
+   to fetch, and a 404 in the console is noise. */
+window.va = window.va || function(){ (window.vaq = window.vaq || []).push(arguments); };
+if(/^https?:$/.test(location.protocol)){
+  var vaScript = document.createElement('script');
+  vaScript.defer = true;
+  vaScript.src = '/_vercel/insights/script.js';
+  document.head.appendChild(vaScript);
+}
+</script>
+<script>
 /* The inline manifest covers the single-file case. When the companion
    manifest.webmanifest and icon files are served next to this page, switch to
    those, because some browsers only honour a real file when installing.
