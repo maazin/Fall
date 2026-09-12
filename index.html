@@ -536,6 +536,41 @@
     font-size:12.5px;line-height:1.45;color:var(--plum-soft);
   }
 
+  .board li.me{background:#FFF0F7;box-shadow:0 3px 0 var(--bubblegum-dk)}
+  .board li .rank{
+    width:26px;flex:none;text-align:center;
+    font-family:"Baloo 2",sans-serif;font-weight:800;color:var(--plum-soft);font-size:14px;
+  }
+  .board li.top1 .rank{color:#C98800;font-size:17px}
+
+  .nameask{
+    display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;
+    background:#fff;border-radius:20px;padding:11px 14px;margin-top:14px;
+    box-shadow:0 4px 0 rgba(75,42,85,.10);
+  }
+  .nameask p{
+    margin:0;width:100%;text-align:center;
+    font-family:"Nunito",sans-serif;font-weight:800;font-size:12px;color:var(--plum-soft);
+  }
+  .nameask input{
+    font-family:"Baloo 2",sans-serif;font-weight:700;font-size:16px;color:var(--plum);
+    border:3px solid #FFD9EC;border-radius:999px;padding:7px 14px;width:170px;text-align:center;
+    outline:none;
+  }
+  .nameask input:focus{border-color:var(--bubblegum)}
+  .nameask button{
+    font-family:"Baloo 2",sans-serif;font-weight:800;font-size:15px;color:#fff;
+    background:var(--mint);border:none;border-radius:999px;padding:9px 20px;cursor:pointer;
+    box-shadow:0 4px 0 #18988C;
+  }
+  .nameask button:active{transform:translateY(3px);box-shadow:0 1px 0 #18988C}
+  .netnote{
+    margin:10px 0 0;font-family:"Nunito",sans-serif;font-weight:800;
+    font-size:11.5px;color:var(--plum-soft);text-align:center;
+  }
+  .netnote.good{color:#18988C}
+  .netnote.bad{color:var(--bubblegum-dk)}
+
   .board{list-style:none;margin:14px 0 0;padding:0;text-align:left;max-width:340px;margin-inline:auto}
   .board li{
     display:flex;align-items:center;gap:10px;
@@ -686,8 +721,11 @@
 
       <button class="btn" id="toPickBtn">Pick my buddy!</button>
       <div class="btn-row">
-        <button class="btn ghost" id="boardBtn">Best runs</button>
+        <button class="btn ghost" id="boardBtn">My runs</button>
         <button class="btn ghost" id="squadBtn">Squad book</button>
+      </div>
+      <div class="btn-row" id="globalRow">
+        <button class="btn ghost" id="globalBtn">Global board</button>
       </div>
       <label class="opt"><input type="checkbox" id="flashOpt"> Turn off lightning flashes</label>
     </div>
@@ -733,6 +771,17 @@
     </div>
   </section>
 
+  <!-- GLOBAL BOARD -->
+  <section class="screen hidden" id="screenGlobal">
+    <div class="card">
+      <p class="eyebrow">Everyone playing</p>
+      <h2>Global board</h2>
+      <ol class="board" id="globalList"></ol>
+      <p class="netnote" id="globalNote"></p>
+      <div class="btn-row"><button class="btn" id="globalBackBtn">Back</button></div>
+    </div>
+  </section>
+
   <!-- RESULTS -->
   <section class="screen hidden" id="screenOver">
     <div class="card">
@@ -747,8 +796,15 @@
         <button class="btn" id="againBtn">Play again</button>
         <button class="btn ghost" id="rePickBtn">New buddy</button>
       </div>
+      <div class="nameask hidden" id="nameAsk">
+        <p>Put this on the global board?</p>
+        <input id="nameInput" type="text" maxlength="14" placeholder="your name" autocomplete="off" spellcheck="false">
+        <button type="button" id="nameSave">Post it</button>
+      </div>
+      <p class="netnote" id="postNote"></p>
       <div class="btn-row">
-        <button class="btn ghost" id="overBoardBtn">Best runs</button>
+        <button class="btn ghost" id="overBoardBtn">My runs</button>
+        <button class="btn ghost" id="overGlobalBtn">Global</button>
         <button class="btn ghost" id="homeBtn">Home</button>
       </div>
     </div>
@@ -844,6 +900,7 @@
   const screenOver = document.getElementById('screenOver');
   const screenBoard = document.getElementById('screenBoard');
   const screenSquad = document.getElementById('screenSquad');
+  const screenGlobal = document.getElementById('screenGlobal');
   const buddyGrid = document.getElementById('buddyGrid');
   const stormEl = document.getElementById('storm');
   const flashEl = document.getElementById('flash');
@@ -1318,7 +1375,7 @@
     document.getElementById('perkLong').textContent = pk.long || pk.d;
   }
 
-  function show(el){ [screenTitle, screenPick, screenOver, screenBoard, screenSquad].forEach(function(s){ s.classList.add('hidden'); }); if(el) el.classList.remove('hidden'); }
+  function show(el){ [screenTitle, screenPick, screenOver, screenBoard, screenSquad, screenGlobal].forEach(function(s){ s.classList.add('hidden'); }); if(el) el.classList.remove('hidden'); }
 
   document.getElementById('toPickBtn').addEventListener('click', function(){ audio(); sfx.tap(); showPerk(picked); show(screenPick); });
   document.getElementById('startBtn').addEventListener('click', function(){ sfx.tap(); begin(); });
@@ -1382,6 +1439,148 @@
     sfx.tap(); boardFrom = screenOver; renderBoard(); show(screenBoard);
   });
   document.getElementById('homeBtn').addEventListener('click', function(){ sfx.tap(); show(screenTitle); });
+
+  /* ---------------- the shared board ----------------
+     Scores go to /api/scores, which keeps one best-ever row per name.
+     Only reachable over http(s): opened straight off disk there is no API to
+     talk to, so the buttons hide themselves and the game works as before. */
+  const API = 'api/scores';
+  function online(){ return /^https?:$/.test(location.protocol); }
+
+  let playerName = '';
+  try{ playerName = localStorage.getItem('squishPlayer') || ''; }catch(e){}
+
+  const nameAsk   = document.getElementById('nameAsk');
+  const nameInput = document.getElementById('nameInput');
+  const postNote  = document.getElementById('postNote');
+  const globalList = document.getElementById('globalList');
+  const globalNote = document.getElementById('globalNote');
+
+  if(!online()){
+    const row = document.getElementById('globalRow');
+    if(row) row.style.display = 'none';
+    const og = document.getElementById('overGlobalBtn');
+    if(og) og.style.display = 'none';
+  }
+
+  function note(el, text, kind){
+    el.textContent = text || '';
+    el.className = 'netnote' + (kind ? ' ' + kind : '');
+  }
+
+  function postScore(finalScore){
+    if(!online() || !playerName || finalScore <= 0) return;
+    note(postNote, 'Posting to the global board...');
+    fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: playerName,
+        score: finalScore,
+        buddy: CHARS[picked].name,
+        mode: mode,
+        diff: diffKey
+      })
+    }).then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(res){
+        if(!res.ok){
+          if(res.j && res.j.error === 'not_configured'){
+            note(postNote, 'Global board is not switched on yet.', 'bad');
+          } else if(res.j && res.j.error === 'slow_down'){
+            note(postNote, 'Posting too fast, try the next round.', 'bad');
+          } else {
+            note(postNote, 'Could not reach the global board.', 'bad');
+          }
+          return;
+        }
+        if(res.j.improved) note(postNote, 'New personal best on the global board!', 'good');
+        else note(postNote, 'Global best for ' + playerName + ' is still ' + res.j.best + '.', '');
+      })
+      .catch(function(){ note(postNote, 'Could not reach the global board.', 'bad'); });
+  }
+
+  function askOrPost(finalScore){
+    nameAsk.classList.add('hidden');
+    note(postNote, '');
+    if(!online() || finalScore <= 0) return;
+    if(playerName){ postScore(finalScore); return; }
+    nameInput.value = '';
+    nameAsk.classList.remove('hidden');
+  }
+
+  document.getElementById('nameSave').addEventListener('click', function(){
+    const v = nameInput.value.trim().slice(0, 14);
+    if(!v){ nameInput.focus(); return; }
+    playerName = v;
+    try{ localStorage.setItem('squishPlayer', v); }catch(e){}
+    nameAsk.classList.add('hidden');
+    sfx.tap();
+    postScore(parseInt(document.getElementById('finalScore').textContent, 10) || 0);
+  });
+  nameInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('nameSave').click(); }
+  });
+
+  function renderGlobal(){
+    globalList.innerHTML = '<li class="empty">Loading...</li>';
+    note(globalNote, '');
+    fetch(API, { headers: { 'Accept': 'application/json' } })
+      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(res){
+        globalList.innerHTML = '';
+        if(!res.ok){
+          globalList.innerHTML = '<li class="empty">Board unavailable</li>';
+          note(globalNote, res.j && res.j.error === 'not_configured'
+            ? 'Add the Upstash for Redis integration in Vercel to switch this on.'
+            : 'Something went wrong fetching the board.', 'bad');
+          return;
+        }
+        const rows = (res.j && res.j.rows) || [];
+        if(!rows.length){
+          globalList.innerHTML = '<li class="empty">Nobody has posted yet. Be first!</li>';
+          return;
+        }
+        rows.forEach(function(e, i){
+          const ci = CHARS.map(function(c){ return c.name; }).indexOf(e.buddy);
+          const c = ci > -1 ? CHARS[ci] : null;
+          const li = document.createElement('li');
+          li.className = (i === 0 ? 'top1 ' : '') + (e.name === playerName ? 'me' : '');
+          li.innerHTML =
+            '<span class="rank">' + (i === 0 ? '\uD83C\uDFC6' : '#' + (i + 1)) + '</span>' +
+            (c ? '<img src="' + c.src + '" alt="">' : '') +
+            '<span>' + escapeText(e.name) +
+            '<small>' + (e.buddy ? escapeText(e.buddy) + ' \u00B7 ' : '') +
+            (e.mode === 'endless' ? 'Endless' : '60s') + ' \u00B7 ' +
+            (DIFFS[e.diff] ? DIFFS[e.diff].label : 'Normal') +
+            (e.at ? ' \u00B7 ' + e.at : '') + '</small></span>' +
+            '<b>' + e.score + '</b>';
+          globalList.appendChild(li);
+        });
+        note(globalNote, playerName ? 'Posting as ' + playerName : '');
+      })
+      .catch(function(){
+        globalList.innerHTML = '<li class="empty">Board unavailable</li>';
+        note(globalNote, 'Could not reach the board. Are you offline?', 'bad');
+      });
+  }
+
+  // names come back from a server other people write to, so never trust them as markup
+  function escapeText(t){
+    return String(t).replace(/[&<>"']/g, function(ch){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
+    });
+  }
+
+  let globalFrom = screenTitle;
+  document.getElementById('globalBtn').addEventListener('click', function(){
+    sfx.tap(); globalFrom = screenTitle; renderGlobal(); show(screenGlobal);
+  });
+  document.getElementById('overGlobalBtn').addEventListener('click', function(){
+    sfx.tap(); globalFrom = screenOver; renderGlobal(); show(screenGlobal);
+  });
+  document.getElementById('globalBackBtn').addEventListener('click', function(){
+    sfx.tap(); show(globalFrom);
+  });
 
   /* ---------------- squad book + badges ---------------- */
   const BADGES = [
@@ -2389,6 +2588,7 @@
       if(i < tier) setTimeout(function(el){ return function(){ el.classList.add('on'); tone(700 + Math.random()*200, 0, .2, 'sine', .14); }; }(s), 320 + i * 300);
     }
 
+    askOrPost(score);
     show(screenOver);
     setTimeout(function(){ sfx.fanfare(); if(tier >= 2 && !reduceMotion) confetti(); }, 260);
   }
