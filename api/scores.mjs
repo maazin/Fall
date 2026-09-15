@@ -24,6 +24,13 @@ const ZKEY = 'fall:best';
 const HKEY = 'fall:meta';
 const TOP = 20;
 
+/* Per-buddy boards live in their own sorted sets, so picking a weaker buddy is a
+   separate contest rather than a guaranteed loss on the overall board. */
+function buddyKey(name) {
+  const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return slug ? 'fall:b:' + slug : null;
+}
+
 const MAX_SCORE = 5000;      // far above any real run, blocks silly numbers
 const MAX_NAME = 14;
 const POSTS_PER_HOUR = 40;   // per IP
@@ -73,6 +80,21 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      // ?buddy=Mel narrows the board to one character
+      const asked = (req.query && req.query.buddy) ||
+        new URL(req.url, 'http://x').searchParams.get('buddy');
+      const bk = asked ? buddyKey(asked) : null;
+
+      if (bk) {
+        const one = await redis([['ZRANGE', bk, '0', String(TOP - 1), 'REV', 'WITHSCORES']]);
+        const fl = (one[0] && one[0].result) || [];
+        const rows = [];
+        for (let i = 0; i < fl.length; i += 2) {
+          rows.push({ name: fl[i], score: Number(fl[i + 1]), buddy: asked, mode: null, diff: null, at: null });
+        }
+        return res.status(200).json({ buddy: asked, rows: rows });
+      }
+
       const out = await redis([
         ['ZRANGE', ZKEY, '0', String(TOP - 1), 'REV', 'WITHSCORES'],
         ['HGETALL', HKEY]
@@ -121,25 +143,41 @@ export default async function handler(req, res) {
         return res.status(429).json({ error: 'slow_down' });
       }
 
-      const prev = await redis([['ZSCORE', ZKEY, name]]);
-      const raw = prev[0] && prev[0].result;
-      const best = (raw === null || raw === undefined) ? -1 : Number(raw);
+      const buddy = typeof body.buddy === 'string' ? body.buddy.slice(0, 24) : null;
+      const bk = buddy ? buddyKey(buddy) : null;
 
+      // read the overall best and the per-buddy best together
+      const prev = await redis(
+        bk ? [['ZSCORE', ZKEY, name], ['ZSCORE', bk, name]]
+           : [['ZSCORE', ZKEY, name]]
+      );
+      const num = (i) => {
+        const raw = prev[i] && prev[i].result;
+        return (raw === null || raw === undefined) ? -1 : Number(raw);
+      };
+      const best = num(0);
+      const buddyBest = bk ? num(1) : -1;
+
+      const writes = [];
       if (score > best) {
-        const meta = JSON.stringify({
-          buddy: typeof body.buddy === 'string' ? body.buddy.slice(0, 24) : null,
+        writes.push(['ZADD', ZKEY, String(score), name]);
+        writes.push(['HSET', HKEY, name, JSON.stringify({
+          buddy: buddy,
           mode: body.mode === 'endless' ? 'endless' : 'round',
           diff: ['chill', 'normal', 'storm'].indexOf(body.diff) > -1 ? body.diff : 'normal',
           at: new Date().toISOString().slice(0, 10)
-        });
-        await redis([
-          ['ZADD', ZKEY, String(score), name],
-          ['HSET', HKEY, name, meta]
-        ]);
-        return res.status(200).json({ ok: true, improved: true, best: score });
+        })]);
       }
+      if (bk && score > buddyBest) writes.push(['ZADD', bk, String(score), name]);
+      if (writes.length) await redis(writes);
 
-      return res.status(200).json({ ok: true, improved: false, best: best });
+      return res.status(200).json({
+        ok: true,
+        improved: score > best,
+        best: Math.max(best, score > best ? score : best),
+        buddyImproved: bk ? score > buddyBest : false,
+        buddyBest: bk ? Math.max(buddyBest, score) : null
+      });
     }
 
     res.setHeader('Allow', 'GET, POST');
