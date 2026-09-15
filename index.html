@@ -574,6 +574,24 @@ if(/^https?:$/.test(location.protocol)){
     font-size:12.5px;line-height:1.45;color:var(--plum-soft);
   }
 
+  /* buddy filter: a scrollable strip so picking a weaker buddy is its own contest */
+  .bfilter{
+    display:flex;gap:6px;margin-top:14px;padding:4px 2px 8px;
+    overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .bfilter::-webkit-scrollbar{display:none}
+  .bfilter button{
+    flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;
+    background:#fff;border:3px solid #fff;border-radius:14px;padding:5px 7px;cursor:pointer;
+    box-shadow:0 3px 0 rgba(75,42,85,.10);
+    font-family:"Nunito",sans-serif;font-weight:900;font-size:8.5px;color:var(--plum-soft);
+    text-transform:uppercase;letter-spacing:.02em;
+  }
+  .bfilter button img{width:34px;height:34px;object-fit:contain;pointer-events:none}
+  .bfilter button.sel{border-color:var(--bubblegum);background:#FFF0F7;color:var(--bubblegum-dk);box-shadow:0 3px 0 var(--bubblegum-dk)}
+  .bfilter .allbtn{font-size:11px;min-width:46px;justify-content:center;padding:9px 8px}
+
   .board li.me{background:#FFF0F7;box-shadow:0 3px 0 var(--bubblegum-dk)}
   .board li .rank{
     width:26px;flex:none;text-align:center;
@@ -898,6 +916,7 @@ if(/^https?:$/.test(location.protocol)){
     <div class="card">
       <p class="eyebrow">Everyone playing</p>
       <h2>Global board</h2>
+      <div class="bfilter" id="bFilter"></div>
       <ol class="board" id="globalList"></ol>
       <p class="netnote" id="globalNote"></p>
       <div class="btn-row"><button class="btn" id="globalBackBtn">Back</button></div>
@@ -952,13 +971,13 @@ if(/^https?:$/.test(location.protocol)){
                         speed:1.55, snap:2.1, trail:1,
                         long:'She moves 55% faster on the keyboard and tracks your finger or mouse more than twice as tightly as anyone else, so she goes exactly where you point instead of drifting there. She leaves a rainbow blur when she really gets going.' },
 
-    'Omar':           { t:'Bear Hug',       d:'Every friend is worth 2',
-                        friendVal:2,
-                        long:'Ordinary friends pay 2 points each instead of 1, before your multiplier. Nobody else changes what a plain catch is worth, so he quietly out-scores everyone on volume alone.' },
+    'Omar':           { t:'Bear Hug',       d:'Every friend pays 1 extra',
+                        friendBonus:1,
+                        long:'Every ordinary friend pays one extra point on top of your multiplier. The bonus is flat rather than multiplied, so it rewards steady volume instead of compounding into a runaway streak.' },
 
     'Mamu':           { t:'Lucky Bun',      d:'Multipliers arrive early',
-                        tiers:[3, 8, 14], window:1.8,
-                        long:'You hit x2 at 3 catches, x3 at 8 and x4 at 14, instead of 5, 12 and 20. Your streak also survives 80% longer between catches, so she lives at a high multiplier while everyone else is still building one.' },
+                        tiers:[4, 10, 16], window:1.5,
+                        long:'You hit x2 at 4 catches, x3 at 10 and x4 at 16, instead of 5, 12 and 20. Your streak also survives 50% longer between catches, so she lives at a high multiplier while everyone else is still building one.' },
 
     'Pineapple':      { t:'Sunshine',       d:'Ten more seconds on the clock',
                         extraTime:10, grace:15,
@@ -968,17 +987,17 @@ if(/^https?:$/.test(location.protocol)){
                         pull:1, magnetBoost:1.7,
                         long:'Friends near you drift toward you all round long without any bubble, and magnet bubbles last 70% longer and pull 35% harder in your hands.' },
 
-    'Bessie':         { t:'Storm Eater',    d:'Lightning cannot hurt her',
-                        boltImmune:1,
-                        long:'She eats lightning. Bolts pass straight through her for no damage at all, which makes the late storm almost harmless. Rain still costs a heart, so she is not invincible, just fearless about the worst hazard in the game.' },
+    'Bessie':         { t:'Storm Eater',    d:'Eats lightning for 2 points',
+                        boltImmune:1, boltPay:2,
+                        long:'She eats lightning. Bolts do her no damage at all and each one she swallows pays 2 points and keeps her streak going, so the late storm turns from the worst hazard in the game into her best scoring window. Rain still costs a heart.' },
 
     'Mel':            { t:'Melon Shell',    d:'Holds two shields',
                         shield:1, shieldMax:2,
-                        long:'You start with a shield and can stack two at once. Every other buddy caps at one, so every shield bubble is effectively two free hits for her.' },
+                        long:'You start with a shield and can stack two at once, where everyone else caps at one, so each bubble is two free hits. Any shield you still hold when the clock runs out pays 12 points, so not needing them is its own reward.' },
 
-    'Cheryl':         { t:'Sticky Web',     d:'Missed friends stick to the ground',
+    'Cheryl':         { t:'Sticky Web',     d:'Web saves missed friends for +1',
                         webTime:1.7,
-                        long:'Friends you miss land in a web on the ground and sit there for 1.7 seconds instead of vanishing, so you can walk over and pick them up late. She is the only buddy who gets a second chance at a drop.' },
+                        long:'Friends you miss land in a web on the ground and wait 1.7 seconds instead of vanishing, so you can stroll over and collect them. Each one you rescue out of the web pays 1 extra point. She is the only buddy who gets a second chance at a drop.' },
 
     'Ronnie':         { t:'Moo Muscle',     d:'One extra heart',
                         hearts:1, heartLuck:2.4,
@@ -1643,10 +1662,35 @@ if(/^https?:$/.test(location.protocol)){
     if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('nameSave').click(); }
   });
 
+  let boardBuddy = null;                 // null means the overall board
+
+  function buildFilter(){
+    const strip = document.getElementById('bFilter');
+    if(strip.children.length) return;    // build once
+    const mk = (label, img, val) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      if(img) btn.innerHTML = '<img src="' + img + '" alt="">' + escapeText(label);
+      else { btn.className = 'allbtn'; btn.textContent = label; }
+      btn.addEventListener('click', function(){
+        boardBuddy = val;
+        [].forEach.call(strip.children, function(c){ c.classList.remove('sel'); });
+        btn.classList.add('sel');
+        sfx.tap();
+        renderGlobal();
+      });
+      strip.appendChild(btn);
+      return btn;
+    };
+    mk('All', null, null).classList.add('sel');
+    CHARS.forEach(function(c){ mk(c.name.split(' ')[0], c.src, c.name); });
+  }
+
   function renderGlobal(){
+    buildFilter();
     globalList.innerHTML = '<li class="empty">Loading...</li>';
     note(globalNote, '');
-    fetch(API, { headers: { 'Accept': 'application/json' } })
+    fetch(API + (boardBuddy ? '?buddy=' + encodeURIComponent(boardBuddy) : ''), { headers: { 'Accept': 'application/json' } })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(res){
         globalList.innerHTML = '';
@@ -1659,7 +1703,9 @@ if(/^https?:$/.test(location.protocol)){
         }
         const rows = (res.j && res.j.rows) || [];
         if(!rows.length){
-          globalList.innerHTML = '<li class="empty">Nobody has posted yet. Be first!</li>';
+          globalList.innerHTML = '<li class="empty">' +
+            (boardBuddy ? 'Nobody has posted with ' + escapeText(boardBuddy) + ' yet' : 'Nobody has posted yet. Be first!') +
+            '</li>';
           return;
         }
         rows.forEach(function(e, i){
@@ -1678,7 +1724,8 @@ if(/^https?:$/.test(location.protocol)){
             '<b>' + e.score + '</b>';
           globalList.appendChild(li);
         });
-        note(globalNote, playerName ? 'Posting as ' + playerName : '');
+        note(globalNote, (boardBuddy ? 'Best runs with ' + boardBuddy + '. ' : '') +
+          (playerName ? 'Posting as ' + playerName : ''));
       })
       .catch(function(){
         globalList.innerHTML = '<li class="empty">Board unavailable</li>';
@@ -1720,6 +1767,7 @@ if(/^https?:$/.test(location.protocol)){
   }
   function saveJSON(key, v){ try{ localStorage.setItem(key, JSON.stringify(v)); }catch(e){} }
   let squad = loadJSON('squishSquad', {});
+  let buddyBest = loadJSON('squishBuddyBest', {});
   let badges = loadJSON('squishBadges', {});
 
   function renderSquad(){
@@ -1727,9 +1775,11 @@ if(/^https?:$/.test(location.protocol)){
     grid.innerHTML = '';
     CHARS.forEach(function(c, i){
       const n = squad[i] || 0;
+      const pb = buddyBest[i] || 0;
       const d = document.createElement('div');
       d.className = 'sq' + (n ? '' : ' locked');
-      d.innerHTML = '<img src="' + c.src + '" alt=""><span>' + c.name + '</span><b>' + (n ? n + ' caught' : 'not yet') + '</b>';
+      d.innerHTML = '<img src="' + c.src + '" alt=""><span>' + c.name + '</span><b>' +
+        (pb ? 'best ' + pb : (n ? n + ' caught' : 'not yet')) + '</b>';
       grid.appendChild(d);
     });
     const brow = document.getElementById('badgeRow');
@@ -1897,7 +1947,7 @@ if(/^https?:$/.test(location.protocol)){
         burst(fx, fy, ['#FF8CE6','#FFD9F5','#FFF'], 12);
       } else if(f.kind === 'friend') {
         grabbed++;
-        gained += m * (perk.friendVal || 1);
+        gained += m + (perk.friendBonus || 0);
         if(f.ci >= 0) runCaught[f.ci] = (runCaught[f.ci] || 0) + 1;
         burst(fx, fy, ['#FF4F9A','#2FCBBD','#FFC53C','#FFF'], 10);
       } else if(f.kind === 'star'){
@@ -2300,9 +2350,13 @@ if(/^https?:$/.test(location.protocol)){
     }
 
     if(f.kind === 'bolt' && perk.boltImmune){
+      // immunity alone scored nothing, so eating lightning is income for her
+      const eaten = perk.boltPay || 0;
+      score += eaten;
+      if(eaten){ combo++; comboT = comboWindow(); scoreVal.textContent = score; drawCombo(); }
       ripple(cx, cy, f.size * 1.6, 'rgba(255,216,77,.95)');
       burst(cx, cy, ['#FFD84D','#FFF3B8','#8CD2FF','#FFF'], 22);
-      floatText('nom!', cx, cy, 'star');
+      floatText(eaten ? 'nom! +' + eaten : 'nom!', cx, cy, 'star');
       sfx.shield();
       player.classList.remove('squish'); void player.offsetWidth; player.classList.add('squish');
       return;
@@ -2356,8 +2410,11 @@ if(/^https?:$/.test(location.protocol)){
       burst(cx, cy, ['#FFC53C','#FFE9A8','#FFF','#FF4F9A'], 26);
       sfx.star();
     } else {
-      score += m * (perk.friendVal || 1);
-      const fv = m * (perk.friendVal || 1);
+      // flat and unmultiplied, so a x4 streak pays 5 rather than 8
+      // a friend rescued off the ground out of Cheryl's web is worth extra
+      const webSave = (f.webbed && perk.webTime) ? 1 : 0;
+      const fv = m + (perk.friendBonus || 0) + webSave;
+      score += fv;
       floatText(m > 1 ? '+' + fv + '  x' + m : '+' + fv, cx, cy);
       burst(cx, cy, ['#FF4F9A','#2FCBBD','#FFC53C','#8C6BFF','#FFF'], 16);
       sfx.catch(combo);
@@ -2618,11 +2675,15 @@ if(/^https?:$/.test(location.protocol)){
     const base = score;
     // only pay for hearts you carried to the end of a real round, otherwise
     // quitting on turn one would be the best-paying move in the game
-    const heartBonus = fullRound ? hearts * 8 : 0;
+    const heartBonus = fullRound ? hearts * 12 : 0;
+    // hoarding shields is Mel's whole identity, so it should pay
+    const shieldBonus = (fullRound && perk.shieldMax > 1) ? shield * 12 : 0;
     // fewer starting hearts means a braver run, so it pays more
-    const braveRate = Math.max(0, (4 - maxHearts) * 0.18);
+    // base this on the difficulty's heart count, not maxHearts: otherwise a perk
+    // that grants an extra heart silently zeroes out its owner's bonus
+    const braveRate = Math.max(0, (4 - diff().hearts) * 0.18);
     const braveBonus = Math.round(base * braveRate);
-    score = base + heartBonus + braveBonus;
+    score = base + heartBonus + shieldBonus + braveBonus;
 
     const tally = document.getElementById('tally');
     tally.innerHTML = '';
@@ -2633,12 +2694,19 @@ if(/^https?:$/.test(location.protocol)){
       tally.appendChild(li);
     }
     tallyRow('Caught', purseUses ? purseUses + ' purse' + (purseUses === 1 ? '' : 's') + ' popped' : '', base);
-    if(heartBonus) tallyRow('Hearts saved', hearts + ' left at 8 each', '+' + heartBonus, 'bonus');
-    if(braveBonus) tallyRow('Brave start', 'only ' + maxHearts + ' hearts, +' + Math.round(braveRate * 100) + '%', '+' + braveBonus, 'bonus');
+    if(heartBonus) tallyRow('Hearts saved', hearts + ' left at 12 each', '+' + heartBonus, 'bonus');
+    if(shieldBonus) tallyRow('Shields kept', shield + ' unspent at 12 each', '+' + shieldBonus, 'bonus');
+    if(braveBonus) tallyRow('Brave start', 'on ' + diff().label + ', +' + Math.round(braveRate * 100) + '%', '+' + braveBonus, 'bonus');
 
     // fold this run into the squad book
     for(const k in runCaught) squad[k] = (squad[k] || 0) + runCaught[k];
     saveJSON('squishSquad', squad);
+
+    // and remember your best with the buddy you just used
+    if(score > (buddyBest[picked] || 0)){
+      buddyBest[picked] = score;
+      saveJSON('squishBuddyBest', buddyBest);
+    }
 
     // badges
     const earned = [];
