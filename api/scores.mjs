@@ -1,8 +1,9 @@
 /* Shared scoreboard for Fall.
  *
- * Storage is two Redis keys:
- *   fall:best  sorted set, member = player name, score = their best ever
- *   fall:meta  hash, player name -> JSON of how they got it
+ * Storage, all under the season prefix (see BOARD_SEASON below):
+ *   <ns>best   sorted set, member = player name, score = their best ever
+ *   <ns>meta   hash, player name -> JSON of how they got it
+ *   <ns>b:<buddy>  one sorted set per character
  *
  * One row per player, so the board answers "who is best" rather than filling
  * up with one person's twenty good runs.
@@ -20,15 +21,23 @@ const TOKEN =
   process.env.UPSTASH_REDIS_REST_TOKEN ||
   process.env.REDIS_REST_TOKEN;
 
-const ZKEY = 'fall:best';
-const HKEY = 'fall:meta';
+/* Seasons. Everything the board reads and writes sits under one prefix, and
+   BOARD_SEASON picks it. Bumping that env var in Vercel starts a completely
+   empty board without deleting anything: set it back to the old number and the
+   old rankings are exactly where they were. Season 1 uses the original key
+   names so nothing already on the board moves. */
+const SEASON = String(process.env.BOARD_SEASON || '1').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) || '1';
+const NS = SEASON === '1' ? 'fall:' : 'fall:s' + SEASON + ':';
+
+const ZKEY = NS + 'best';
+const HKEY = NS + 'meta';
 const TOP = 20;
 
 /* Per-buddy boards live in their own sorted sets, so picking a weaker buddy is a
    separate contest rather than a guaranteed loss on the overall board. */
 function buddyKey(name) {
   const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return slug ? 'fall:b:' + slug : null;
+  return slug ? NS + 'b:' + slug : null;
 }
 
 const MAX_SCORE = 5000;      // far above any real run, blocks silly numbers
@@ -92,7 +101,7 @@ export default async function handler(req, res) {
         for (let i = 0; i < fl.length; i += 2) {
           rows.push({ name: fl[i], score: Number(fl[i + 1]), buddy: asked, mode: null, diff: null, at: null });
         }
-        return res.status(200).json({ buddy: asked, rows: rows });
+        return res.status(200).json({ season: SEASON, buddy: asked, rows: rows });
       }
 
       const out = await redis([
@@ -120,7 +129,7 @@ export default async function handler(req, res) {
           at: m.at || null
         });
       }
-      return res.status(200).json({ rows: rows });
+      return res.status(200).json({ season: SEASON, rows: rows });
     }
 
     if (req.method === 'POST') {
