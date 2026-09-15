@@ -156,6 +156,10 @@ if(/^https?:$/.test(location.protocol)){
   #boss .bossArt{width:100%;height:100%}
   #boss.charging .bossArt{animation:bossPulse .5s ease-in-out infinite}
   @keyframes bossPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+  /* a bubble landing on the big storm: brightness only, so it never fights
+     the inline transform that positions the boss every frame */
+  #boss.hurt{animation:bossHit .2s ease-out}
+  @keyframes bossHit{0%,100%{filter:drop-shadow(0 14px 18px rgba(30,40,70,.4))}45%{filter:drop-shadow(0 14px 18px rgba(30,40,70,.4)) brightness(1.6) saturate(.65)}}
 
   /* ---------- hud ---------- */
   #hud{
@@ -841,7 +845,8 @@ if(/^https?:$/.test(location.protocol)){
         <div class="rule"><span class="chip">⭐</span><span>Grab a star<small>+5 points</small></span></div>
         <div class="rule"><span class="chip">🌧️</span><span>Dodge grumpy rain<small>−1 heart</small></span></div>
         <div class="rule"><span class="chip">⚡</span><span>Watch for lightning<small>−1 heart, fast!</small></span></div>
-        <div class="rule"><span class="chip">🫧</span><span>Pop a bubble<small>heart, shield, magnet…</small></span></div>
+        <div class="rule"><span class="chip">🫧</span><span>Pop a bubble<small>heart, shield, magnet, blaster…</small></span></div>
+        <div class="rule"><span class="chip">🫧</span><span>Blaster bubble<small>shoot the clouds down</small></span></div>
         <div class="rule"><span class="chip">👛</span><span>Grab the purse<small>rare: clears the screen</small></span></div>
         <div class="rule"><span class="chip">🔥</span><span>Chain catches<small>up to x4 points</small></span></div>
       </div>
@@ -1003,9 +1008,9 @@ if(/^https?:$/.test(location.protocol)){
                         hearts:1, heartLuck:2.4,
                         long:'You start with one heart more than the difficulty gives, and heart bubbles are far more likely to drop whenever you are hurt.' },
 
-    'Connor':         { t:'Storm Chaser',   d:'Storm is 14s late',
-                        storm:14,
-                        long:'The storm phase and its lightning arrive 14 seconds later than normal, so you get a much longer calm stretch to build a score before anything gets dangerous.' },
+    'Connor':         { t:'Storm Chaser',   d:'Late storm, long blaster',
+                        storm:14, blastBoost:1.6,
+                        long:'The storm phase and its lightning arrive 14 seconds later than normal, so you get a much longer calm stretch to build a score before anything gets dangerous. He also holds a blaster bubble 60% longer than anyone else, which is 8 seconds of popping instead of 5, so when the clouds finally show up he shoots his way through them.' },
 
     'Lazy Harp Seal': { t:"Can't Be Bothered", d:'Widest reach, slowest waddle',
                         reach:1.42, speed:0.82, snap:0.85, nearBonus:2,
@@ -1091,6 +1096,13 @@ if(/^https?:$/.test(location.protocol)){
   let bestCombo = 0, bossCleared = false, mimicsCaught = 0, purseUses = 0;
   let bossEl = null, bossState = 'none', bossT = 0, bossX = 0, bossDir = 1, bossShots = 0, bossHurt = false;
   const BOSS_AT = 44, BOSS_SHOTS = 8;
+  /* Blaster: while it is up, your buddy pops bubbles straight up on her own.
+     Auto-fire rather than a fire button, because most people play this with one
+     thumb and there is nowhere on a phone to put a second control. */
+  let shots = [], shotT = 0, cloudsPopped = 0;
+  const SHOT_GAP = 0.26;      // seconds between bubbles
+  const SHOT_SPEED = 830;     // pixels a second, straight up
+  const POP_PAY = { rain: 2, bolt: 3 };
   let nextBossAt = BOSS_AT;
 
   /* ---------------- combo + power-ups ---------------- */
@@ -1123,9 +1135,10 @@ if(/^https?:$/.test(location.protocol)){
   const PW = {
     magnet: { t:'Magnet',  dur:4.2, col:'#8C6BFF', ico:'<path d="M22 74V44a28 28 0 0 1 56 0v30H60V44a10 10 0 0 0-20 0v30z" fill="#8C6BFF" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><path d="M22 74h18v14H22zM60 74h18v14H60z" fill="#FF4F9A" stroke="#fff" stroke-width="5"/>' },
     slow:   { t:'Slow-mo', dur:3.6, col:'#2FCBBD', ico:'<circle cx="50" cy="52" r="34" fill="#2FCBBD" stroke="#fff" stroke-width="6"/><path d="M50 32v22l15 10" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/>' },
+    blaster:{ t:'Blaster', dur:5.0, col:'#39D9A0', ico:'<rect x="14" y="46" width="44" height="27" rx="13" fill="#39D9A0" stroke="#fff" stroke-width="6"/><path d="M29 72v13" stroke="#fff" stroke-width="8" stroke-linecap="round"/><rect x="55" y="52" width="17" height="15" rx="7" fill="#39D9A0" stroke="#fff" stroke-width="5"/><circle cx="81" cy="39" r="11" fill="#B6FFE4" stroke="#fff" stroke-width="5"/><circle cx="60" cy="21" r="6" fill="#EAFFF6" stroke="#fff" stroke-width="3.5"/>' },
     x2:     { t:'Double',  dur:5.5, col:'#FFC53C', ico:'<circle cx="50" cy="50" r="36" fill="#FFC53C" stroke="#fff" stroke-width="6"/><text x="50" y="66" font-family="Baloo 2,sans-serif" font-size="44" font-weight="800" fill="#7A4F00" text-anchor="middle">x2</text>' }
   };
-  const pw = { magnet:0, slow:0, x2:0 };
+  const pw = { magnet:0, slow:0, x2:0, blaster:0 };
   function pwActive(k){ return pw[k] > 0; }
   const canVibrate = typeof navigator !== 'undefined' && !!navigator.vibrate;
   /* Short pulses only. A phone motor can't do "soft", so cuteness comes from
@@ -1138,6 +1151,7 @@ if(/^https?:$/.test(location.protocol)){
     zap:      [12, 28, 12, 28, 20],// stutter, like a crackle
     mimic:    [9, 34, 9, 34, 9],   // a giggle
     purse:    [14, 30, 14, 30, 26], // a satisfying clatter of rhinestones
+    pop:      [9, 30, 9],          // a cloud bursting, same shape as the gift tap
     bossWin:  [10, 55, 10, 55, 18],
     gameOver: [24, 70, 16, 70, 9]  // fading away, not a long buzz
   };
@@ -1367,6 +1381,18 @@ if(/^https?:$/.test(location.protocol)){
     },
     // near miss: pure air, no pitch, so it never competes with the music
     whoosh(){ puff(0, 0.26, 0.20, 420, 2600); blip(392, 0.02, 0.2, 0.03, { to: 660, harm: 0 }); },
+    // firing a bubble: a tiny upward bloop. Quiet, because you hear it a lot
+    blast(){
+      puff(0, 0.05, 0.045, 2400, 1300);
+      blip(784, 0, 0.09, 0.05, { to: 1318, bend: 0.55, harm: 0 });
+    },
+    // a cloud bursting: wet pop, then a sweet little note on top
+    popCloud(){
+      puff(0, 0.10, 0.08, 1400, 380);
+      blip(659.25, 0.01, 0.22, 0.095, { to: 987.77, bend: 0.2 });
+    },
+    // a bubble landing on the boss: soft tick, no melody, it happens in bursts
+    bossPing(){ puff(0, 0.06, 0.05, 1900, 900); blip(1046.5, 0, 0.07, 0.035, { harm: 0 }); },
     // power-up / shield: a rising sparkle
     shield(){
       [783.99, 1046.50, 1318.51].forEach(function(f, i){
@@ -1760,6 +1786,7 @@ if(/^https?:$/.test(location.protocol)){
     { id:'allsquad',  t:'Full squad',  d:'Catch every buddy in the game at least once',                       ico:'\uD83C\uDFC6' },
     { id:'endless150',t:'Marathon',    d:'Last two and a half minutes in Endless',                            ico:'\u23F1\uFE0F' },
     { id:'mimic8',    t:'Sparkle thief',d:'Catch 8 of ME\u2019s sparkle mimics in one run',                    ico:'\u2728' },
+    { id:'popper14',  t:'Cloud buster',d:'Blast 14 clouds out of the sky in a single run',                    ico:'\uD83E\uDEE7' },
     { id:'tempest',   t:'Tempest',     d:'Score 60 or more on Storm difficulty',                              ico:'\uD83C\uDF2A\uFE0F' }
   ];
   function loadJSON(key, fallback){
@@ -1834,6 +1861,7 @@ if(/^https?:$/.test(location.protocol)){
     show(null);
     stage.innerHTML = '';
     fallers = []; particles = [];
+    shots = []; shotT = 0; cloudsPopped = 0;
     perk = perkOf(picked);
     maxHearts = diff().hearts + (perk.hearts || 0);
     shieldCap = perk.shieldMax || 1;
@@ -1841,7 +1869,7 @@ if(/^https?:$/.test(location.protocol)){
     score = 0; hearts = maxHearts; timeLeft = roundLen(); combo = 0; elapsed = 0; spawnT = 0;
     waveIdx = 0; paused = false; trailT = 0;
     combo = 0; comboT = 0; bestCombo = 0; bossCleared = false; mimicsCaught = 0; purseUses = 0;
-    pw.magnet = 0; pw.slow = 0; pw.x2 = 0;
+    pw.magnet = 0; pw.slow = 0; pw.x2 = 0; pw.blaster = 0;
     runCaught = {};
     comboPill.classList.remove('on');
     pwRow.innerHTML = '';
@@ -2054,10 +2082,10 @@ if(/^https?:$/.test(location.protocol)){
     spawnAt(kind, s/2 + Math.random() * Math.max(1, W - s), s);
   }
 
-  function isGift(k){ return k === 'pheart' || k === 'pshield' || k === 'magnet' || k === 'slow' || k === 'x2' || k === 'purse'; }
+  function isGift(k){ return k === 'pheart' || k === 'pshield' || k === 'magnet' || k === 'slow' || k === 'x2' || k === 'blaster' || k === 'purse'; }
 
   function pickPowerUp(){
-    const pool = ['magnet','slow','x2','pshield'];
+    const pool = ['magnet','slow','x2','pshield','blaster'];
     // the purse is the rare one: one slot against everything else, ME finds more
     // rare, but not so rare you never meet one: roughly one every other round,
     // and one or two a round for ME
@@ -2145,6 +2173,7 @@ if(/^https?:$/.test(location.protocol)){
      rolls in near the end of the round, rains hazards from overhead,
      and pays out if you come through it without losing a heart */
   function bossSize(){ return Math.max(140, Math.min(250, W * 0.27)); }
+  function bossTopY(){ return Math.max(78, H * 0.105); }
 
   function startBoss(){
     bossState = 'enter'; bossT = 0; bossShots = 0; bossHurt = false;
@@ -2186,7 +2215,7 @@ if(/^https?:$/.test(location.protocol)){
     if(bossState === 'done' || !bossEl) return;
     bossT += dt;
     const bs = bossSize();
-    const targetY = Math.max(78, H * 0.105);
+    const targetY = bossTopY();
 
     if(bossState === 'enter'){
       bossX += bossDir * 320 * dt;
@@ -2319,8 +2348,9 @@ if(/^https?:$/.test(location.protocol)){
         floatText(shield > 1 ? 'double shield!' : (before ? 'shield full' : 'shield!'), cx, cy, 'close');
         burst(cx, cy, ['#78DEFF','#D6F5FF','#FFF'], 22);
       } else {
-        const boost = f.kind === 'magnet' ? (perk.magnetBoost || 1)
-                    : f.kind === 'slow'   ? (perk.slowBoost   || 1) : 1;
+        const boost = f.kind === 'magnet'  ? (perk.magnetBoost || 1)
+                    : f.kind === 'slow'    ? (perk.slowBoost   || 1)
+                    : f.kind === 'blaster' ? (perk.blastBoost  || 1) : 1;
         pw[f.kind] = PW[f.kind].dur * boost;
         floatText(PW[f.kind].t + '!', cx, cy, 'star');
         burst(cx, cy, [PW[f.kind].col,'#FFF'], 22);
@@ -2422,6 +2452,147 @@ if(/^https?:$/.test(location.protocol)){
     }
     scoreVal.textContent = score;
     drawCombo();
+  }
+
+  /* ---------------- blaster ----------------
+     A power-up bubble turns your buddy into a popper for five seconds. She
+     fires on her own, straight up, and every rain cloud or lightning cloud a
+     bubble touches bursts for points. The big storm counts as a cloud too,
+     just a very large one that pays a little per hit. Friends, stars and other
+     bubbles are never shot: they pass right through, so you cannot ruin your
+     own round by holding still under a good drop. */
+
+  function fireShot(){
+    if(!player) return;
+    const ps = playerSize();
+    shots.push({
+      x: px,
+      y: groundY - ps + 8,
+      r: Math.max(12, ps * 0.19),
+      age: 0
+    });
+    if(!reduceMotion){
+      for(let i = 0; i < 4; i++){
+        particles.push({
+          x: px + (Math.random() * 2 - 1) * 7,
+          y: groundY - ps + 12,
+          vx: (Math.random() * 2 - 1) * 60,
+          vy: -30 - Math.random() * 70,
+          g: 260, a: 0.8,
+          r: 2 + Math.random() * 3,
+          life: 0.24, age: 0,
+          c: i % 2 ? '#FFFFFF' : '#39D9A0',
+          spin: Math.random() * 6
+        });
+      }
+    }
+    sfx.blast();
+  }
+
+  function popCloud(f, idx){
+    f.dead = true;
+    const cx = f.x, cy = f.y;
+    const pay = POP_PAY[f.kind] || 2;
+    // flat pay, like a friend: a bubble should not compound with x2 and the
+    // streak, or one lucky blaster during a x4 run would outscore the round
+    score += pay;
+    cloudsPopped++;
+    combo++;
+    if(combo > bestCombo) bestCombo = combo;
+    comboT = comboWindow();
+    scoreVal.textContent = score;
+    drawCombo();
+    f.el.remove();
+    fallers.splice(idx, 1);
+    ripple(cx, cy, f.size * 1.35, 'rgba(182,255,228,.95)');
+    burst(cx, cy, f.kind === 'bolt'
+      ? ['#FFD84D','#B6FFE4','#39D9A0','#FFF']
+      : ['#9FB4C6','#B6FFE4','#39D9A0','#FFF'], 18);
+    floatText('pop! +' + pay, cx, cy, 'star');
+    sfx.popCloud();
+    buzz(HAPTIC.pop);
+  }
+
+  function stepShots(dt){
+    if(pwActive('blaster')){
+      shotT -= dt;
+      if(shotT <= 0){ fireShot(); shotT = SHOT_GAP; }
+    } else {
+      shotT = 0;
+    }
+
+    for(let i = shots.length - 1; i >= 0; i--){
+      const b = shots[i];
+      b.age += dt;
+      b.y -= SHOT_SPEED * dt;
+      if(b.y < -40){ shots.splice(i, 1); continue; }
+
+      let used = false;
+
+      for(let j = fallers.length - 1; j >= 0; j--){
+        const f = fallers[j];
+        if(!f || f.dead) continue;
+        if(f.kind !== 'rain' && f.kind !== 'bolt') continue;
+        const wob = Math.sin(elapsed * 1.7 + f.phase) * f.sway;
+        const dx = (f.x + wob) - b.x, dy = f.y - b.y;
+        const rr = f.size * 0.42 + b.r;
+        if(dx * dx + dy * dy < rr * rr){
+          popCloud(f, j);
+          used = true;
+          break;
+        }
+      }
+      if(used){ shots.splice(i, 1); continue; }
+
+      // the boss, as an ellipse in page pixels
+      if(bossEl && (bossState === 'enter' || bossState === 'fight')){
+        const bs = bossSize();
+        const ex = (b.x - bossX) / (bs * 0.46);
+        const ey = (b.y - (bossTopY() + bs * 0.38)) / (bs * 0.26);
+        if(ex * ex + ey * ey < 1){
+          score += 1;
+          scoreVal.textContent = score;
+          burst(b.x, b.y, ['#B6FFE4','#39D9A0','#FFF'], 9);
+          bossEl.classList.remove('hurt'); void bossEl.offsetWidth; bossEl.classList.add('hurt');
+          sfx.bossPing();
+          shots.splice(i, 1);
+          continue;
+        }
+      }
+    }
+  }
+
+  /* drawn on the effects canvas, which sits above the fallers, so a bubble
+     reads as passing in front of a cloud right up to the moment it bursts */
+  function drawShots(){
+    for(let i = 0; i < shots.length; i++){
+      const b = shots[i];
+      const r = b.r * (1 + Math.sin(b.age * 24) * 0.08);
+      ctx.save();
+      // a soft tail, so a bubble reads as travelling rather than hovering
+      const tail = ctx.createLinearGradient(b.x, b.y, b.x, b.y + r * 4.2);
+      tail.addColorStop(0, 'rgba(182,255,228,.42)');
+      tail.addColorStop(1, 'rgba(182,255,228,0)');
+      ctx.fillStyle = tail;
+      ctx.beginPath();
+      ctx.moveTo(b.x - r * 0.52, b.y);
+      ctx.lineTo(b.x + r * 0.52, b.y);
+      ctx.lineTo(b.x, b.y + r * 4.2);
+      ctx.closePath();
+      ctx.fill();
+      const g = ctx.createRadialGradient(b.x - r * 0.3, b.y - r * 0.35, r * 0.08, b.x, b.y, r);
+      g.addColorStop(0, 'rgba(255,255,255,.98)');
+      g.addColorStop(0.55, 'rgba(182,255,228,.80)');
+      g.addColorStop(1, 'rgba(57,217,160,.34)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 6.2832); ctx.fill();
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = 'rgba(255,255,255,.95)';
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(b.x - r * 0.34, b.y - r * 0.38, r * 0.25, 0, 6.2832);
+      ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.fill();
+      ctx.restore();
+    }
   }
 
   function loop(now){
@@ -2602,7 +2773,9 @@ if(/^https?:$/.test(location.protocol)){
       }
     }
 
+    stepShots(dt);
     stepParticles(dt);
+    drawShots();
     raf = requestAnimationFrame(loop);
   }
 
@@ -2654,13 +2827,14 @@ if(/^https?:$/.test(location.protocol)){
     cancelAnimationFrame(raf);
     fallers.forEach(function(f){ f.el.remove(); });
     fallers = [];
+    shots = []; shotT = 0;
     if(bossEl){ bossEl.remove(); bossEl = null; }
     bossState = 'none';
     resetSky();
     hud.classList.add('hidden');
     comboPill.classList.remove('on');
     pwRow.innerHTML = '';
-    pw.magnet = 0; pw.slow = 0; pw.x2 = 0;
+    pw.magnet = 0; pw.slow = 0; pw.x2 = 0; pw.blaster = 0;
     paused = false;
     pauseEl.classList.add('hidden');
     world.classList.remove('shake');
@@ -2693,7 +2867,10 @@ if(/^https?:$/.test(location.protocol)){
       li.innerHTML = '<span>' + label + (sub ? '<small>' + sub + '</small>' : '') + '</span><b>' + val + '</b>';
       tally.appendChild(li);
     }
-    tallyRow('Caught', purseUses ? purseUses + ' purse' + (purseUses === 1 ? '' : 's') + ' popped' : '', base);
+    const caughtSub = [];
+    if(purseUses) caughtSub.push(purseUses + ' purse' + (purseUses === 1 ? '' : 's') + ' popped');
+    if(cloudsPopped) caughtSub.push(cloudsPopped + ' cloud' + (cloudsPopped === 1 ? '' : 's') + ' blasted');
+    tallyRow('Caught', caughtSub.join(', '), base);
     if(heartBonus) tallyRow('Hearts saved', hearts + ' left at 12 each', '+' + heartBonus, 'bonus');
     if(shieldBonus) tallyRow('Shields kept', shield + ' unspent at 12 each', '+' + shieldBonus, 'bonus');
     if(braveBonus) tallyRow('Brave start', 'on ' + diff().label + ', +' + Math.round(braveRate * 100) + '%', '+' + braveBonus, 'bonus');
@@ -2719,6 +2896,7 @@ if(/^https?:$/.test(location.protocol)){
     if(CHARS.every(function(c, i){ return squad[i]; })) award('allsquad');
     if(isEndless() && elapsed >= 150) award('endless150');
     if(mimicsCaught >= 8) award('mimic8');
+    if(cloudsPopped >= 14) award('popper14');
     if(diffKey === 'storm' && score >= 60) award('tempest');
     if(earned.length) saveJSON('squishBadges', badges);
 
