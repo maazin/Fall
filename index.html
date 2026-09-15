@@ -92,10 +92,10 @@ if(/^https?:$/.test(location.protocol)){
     position:fixed;inset:0;
     overflow:hidden;
     background:linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 45%,var(--sky-low) 100%);
-    touch-action:none;
+    touch-action:manipulation;
     cursor:default;
   }
-  #app.playing{cursor:none}
+  #app.playing{cursor:none;touch-action:none}
 
   /* ---------- scenery ---------- */
   #sun{
@@ -204,6 +204,28 @@ if(/^https?:$/.test(location.protocol)){
   .heart.gone{opacity:.22;transform:scale(.72)}
   #timePill.low{color:var(--bubblegum-dk);animation:tick .5s ease-in-out infinite}
   @keyframes tick{50%{transform:scale(1.08)}}
+
+  /* ---------- phones ----------
+     The HUD ran out of room at 390px: the mute button was pushed off the right
+     edge before the combo pill or any power-up chip appeared. Score, time,
+     hearts and the two buttons stay on the top row; combo and power-ups are
+     forced onto a second row underneath. */
+  @media (max-width:560px){
+    #hud{
+      flex-wrap:wrap;row-gap:8px;gap:7px;
+      padding:calc(10px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) 10px calc(10px + env(safe-area-inset-left));
+    }
+    #hud::after{content:"";flex-basis:100%;order:8;height:0}
+    #comboPill{order:9}
+    #pwRow{order:10}
+    .pill{padding:5px 12px;border-width:3px;font-size:19px;gap:6px;box-shadow:0 4px 0 var(--shadow)}
+    .pill .cap{font-size:9.5px;letter-spacing:.1em}
+    .heart{width:21px;height:21px}
+    #hearts{gap:3px}
+    #comboBar{width:36px}
+    .pw{font-size:13px;padding:2px 9px 2px 5px}
+    .pw svg{width:17px;height:17px}
+  }
 
   .icon-btn{
     width:48px;height:48px;flex:none;border-radius:50%;
@@ -411,6 +433,8 @@ if(/^https?:$/.test(location.protocol)){
     display:grid;place-items:center;
     padding:20px;
     overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
     background:rgba(255,240,248,.55);
     backdrop-filter:blur(3px);
   }
@@ -458,7 +482,7 @@ if(/^https?:$/.test(location.protocol)){
   }
   .btn:hover{transform:translateY(-2px);box-shadow:0 9px 0 var(--bubblegum-dk)}
   .btn:active{transform:translateY(5px);box-shadow:0 2px 0 var(--bubblegum-dk)}
-  .btn.ghost{background:var(--mint);box-shadow:0 7px 0 #18988C;font-size:clamp(16px,2.6vw,21px);padding:11px 28px}
+  .btn.ghost{background:var(--mint);box-shadow:0 7px 0 #18988C;font-size:clamp(16px,2.6vw,21px);padding:12px 28px;min-height:46px}
   .btn.ghost:hover{box-shadow:0 9px 0 #18988C}
   .btn.ghost:active{box-shadow:0 2px 0 #18988C}
   .btn-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
@@ -607,7 +631,17 @@ if(/^https?:$/.test(location.protocol)){
   .buddies{
     display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px;
   }
-  @media (max-width:560px){.buddies{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:560px){
+    /* 3 across instead of 2: 12 buddies go from six rows to four */
+    .buddies{grid-template-columns:repeat(3,1fr);gap:7px;margin-top:16px}
+    .buddy{border-radius:18px;border-width:4px;padding:6px 4px 8px;gap:3px}
+    .buddy span{font-size:11px}
+    .buddy .perk{font-size:8.5px;line-height:1.2}
+    .buddy .perk b{font-size:9px}
+  }
+  @media (max-width:390px){
+    .buddy .perk{display:none}   /* the panel below already spells it out */
+  }
   .buddy{
     background:#fff;border:5px solid #fff;border-radius:24px;
     padding:10px 8px 12px;cursor:pointer;
@@ -648,6 +682,81 @@ if(/^https?:$/.test(location.protocol)){
   .best{font-weight:900;color:var(--plum-soft);letter-spacing:.05em;margin-top:8px}
   #overBuddy{width:120px;height:120px;object-fit:contain;margin:0 auto;display:block;animation:hop 1s ease-in-out infinite}
   @keyframes hop{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-12px) rotate(4deg)}}
+
+  /* phones again: claw back vertical space so the cards stop being a scroll */
+  @media (max-width:560px){
+    .screen{padding:12px 10px calc(14px + env(safe-area-inset-bottom))}
+    .card{border-radius:26px;border-width:5px;padding:18px 14px 20px}
+    h1{font-size:clamp(30px,10vw,44px);line-height:1.02}
+    h2{font-size:clamp(22px,6.5vw,30px)}
+    .lede{font-size:13.5px;line-height:1.42;margin-top:8px}
+    .btn{font-size:20px;padding:12px 28px;margin-top:16px}
+    .btn.ghost{font-size:15px;padding:12px 18px}
+    .btn-row{gap:9px}
+    .rules{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:14px}
+    .rule{text-align:left}
+    .rule{padding:7px 11px 7px 7px;font-size:12px;border-radius:15px;gap:7px}
+    .rule .chip{width:31px;height:31px}
+    .rule small{font-size:10.5px}
+    .seg{gap:6px;margin-top:9px}
+    .seg button{font-size:13.5px;padding:9px 14px;border-width:3px}
+    .seg button small{font-size:9.5px}
+    .seg-label{margin-top:13px;font-size:9.5px}
+    .perkbox{padding:9px 12px 9px 9px;gap:10px;border-radius:17px;margin-top:12px}
+    .perkbox img{width:50px;height:50px}
+    .perkbox .pname{font-size:13.5px}
+    .perkbox .pdesc{font-size:11.5px;line-height:1.38}
+    .opt{margin-top:11px;font-size:12px}
+    .opt input{width:24px;height:24px}
+    .tally{max-width:100%}
+    .board{max-width:100%}
+    .board li{padding:7px 11px;font-size:13px}
+    .board li img{width:30px;height:30px}
+    .nameask input{width:150px;font-size:16px}
+    .bigscore{font-size:clamp(52px,17vw,76px)}
+    .stars svg{width:clamp(38px,9vw,52px)}
+  }
+
+  /* short viewports, which is mostly phones held sideways */
+  @media (max-height:560px) and (min-width:561px){
+    .screen{padding:10px 14px}
+    .card{padding:14px 18px 16px;border-radius:22px;border-width:5px}
+    h1{font-size:clamp(26px,5vw,38px);line-height:1.02}
+    h2{font-size:clamp(20px,4vw,28px)}
+    .lede{font-size:13px;line-height:1.35;margin-top:6px;max-width:60ch}
+    .rules{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+    .rule{text-align:left;padding:6px 10px 6px 6px;font-size:11.5px}
+    .rule .chip{width:28px;height:28px}
+    .rule small{font-size:10px}
+    .btn{margin-top:12px;padding:10px 24px;font-size:19px}
+    .btn.ghost{font-size:14px;padding:10px 16px;min-height:42px}
+    .seg{margin-top:7px}
+    .seg-label{margin-top:10px}
+    .seg button{padding:7px 13px;font-size:13px}
+    .buddies{grid-template-columns:repeat(6,1fr);gap:6px;margin-top:12px}
+    .buddy{padding:5px 3px 7px;border-radius:15px;border-width:3px}
+    .buddy span{font-size:10px}
+    .buddy .perk{display:none}
+    .perkbox{margin-top:10px;padding:8px 12px 8px 8px}
+    .perkbox img{width:44px;height:44px}
+    .perkbox .pdesc{font-size:11px;line-height:1.32}
+    .squad{grid-template-columns:repeat(8,1fr)}
+    .badges{grid-template-columns:repeat(3,1fr)}
+  }
+
+  /* very small phones, 320px class */
+  @media (max-width:360px){
+    .card{padding:14px 11px 16px}
+    .lede{font-size:12.5px}
+    .rules{gap:5px}
+    .rule{padding:6px 8px 6px 5px;font-size:11px;gap:5px}
+    .rule .chip{width:26px;height:26px}
+    .rule small{font-size:9.5px}
+    .buddies{gap:5px}
+    .buddy span{font-size:10px}
+    .seg button{padding:8px 11px;font-size:12.5px}
+    .btn{font-size:18px;padding:11px 22px}
+  }
 
   @media (prefers-reduced-motion:reduce){
     .cloud,.faller .art,#overBuddy,#timePill.low,#flash.zap,#world.shake,.ring,#shieldRing,.faller.mimic img,.faller.mimic .art::before{animation:none !important}
@@ -707,7 +816,7 @@ if(/^https?:$/.test(location.protocol)){
     <div class="card">
       <p class="eyebrow">A very squishy game</p>
       <h1>Squish Squad Catch</h1>
-      <p class="lede">The squad is falling out of the sky! Slide your buddy left and right and catch as many friends as you can. It starts gentle, then a storm rolls in. Chain catches for a multiplier, grab the bubbles, and pick your buddy carefully, because each one has its own perk.</p>
+      <p class="lede">The squad is falling out of the sky. Slide left and right to catch them. It starts gentle, then a storm rolls in. Chain catches for a multiplier, grab the bubbles, and pick your buddy carefully.</p>
 
       <div class="rules">
         <div class="rule"><span class="chip" id="ruleFriend"></span><span>Catch a friend<small>+1 point</small></span></div>
@@ -715,7 +824,6 @@ if(/^https?:$/.test(location.protocol)){
         <div class="rule"><span class="chip">🌧️</span><span>Dodge grumpy rain<small>−1 heart</small></span></div>
         <div class="rule"><span class="chip">⚡</span><span>Watch for lightning<small>−1 heart, fast!</small></span></div>
         <div class="rule"><span class="chip">🫧</span><span>Pop a bubble<small>heart, shield, magnet…</small></span></div>
-        <div class="rule"><span class="chip">✨</span><span>Beware ME<small>she copies the cows</small></span></div>
         <div class="rule"><span class="chip">👛</span><span>Grab the purse<small>rare: clears the screen</small></span></div>
         <div class="rule"><span class="chip">🔥</span><span>Chain catches<small>up to x4 points</small></span></div>
       </div>
@@ -884,9 +992,9 @@ if(/^https?:$/.test(location.protocol)){
                         reach:1.42, speed:0.82, snap:0.85, nearBonus:2,
                         long:'She refuses to chase anything, so the squad has to come to her. Her catch area is 42% wider than normal, the biggest in the game, but she waddles 18% slower, so you pick a good spot and let things land. Brushing past a hazard pays 2 instead of 1, because she never panics.' },
 
-    'ME':             { t:'Sparkle Thief',  d:'Double bubbles, finds purses',
+    'ME':             { t:'Sparkle Thief',  d:'Double bubbles, own mimics',
                         pwLuck:2.0, purseLuck:2.0, mimicAlly:1,
-                        long:'Bubbles drop twice as often for her and rhinestone purses are twice as likely again, which makes her the power-up buddy by a mile. Her sparkle mimics also side with you: catching one pays 3 instead of costing you 2.' }
+                        long:'Bubbles drop twice as often for her and rhinestone purses are twice as likely again, which makes her the power-up buddy by a mile. Her sparkle mimics only ever appear when you play as her, disguised as one of the cows, and each one you catch pays 3.' }
   };
 
   const NO_PERK = { t:'Squishy', d:'A good all-rounder' };
@@ -961,7 +1069,7 @@ if(/^https?:$/.test(location.protocol)){
   let perk = NO_PERK, maxHearts = 3, shield = 0, shieldCap = 1, shieldEl = null;
   let lastPx = 0, trailT = 0;
   let runCaught = {};
-  let bestCombo = 0, bossCleared = false, mimicsSeen = 0, mimicsCaught = 0, purseUses = 0;
+  let bestCombo = 0, bossCleared = false, mimicsCaught = 0, purseUses = 0;
   let bossEl = null, bossState = 'none', bossT = 0, bossX = 0, bossDir = 1, bossShots = 0, bossHurt = false;
   const BOSS_AT = 44, BOSS_SHOTS = 8;
   let nextBossAt = BOSS_AT;
@@ -1604,7 +1712,7 @@ if(/^https?:$/.test(location.protocol)){
     { id:'score100',  t:'Centurion',   d:'Score 100 in a single run',                                         ico:'\u2B50' },
     { id:'allsquad',  t:'Full squad',  d:'Catch every buddy in the game at least once',                       ico:'\uD83C\uDFC6' },
     { id:'endless150',t:'Marathon',    d:'Last two and a half minutes in Endless',                            ico:'\u23F1\uFE0F' },
-    { id:'nomimic',   t:'Not fooled',  d:'Finish a round having dodged every sparkle mimic',                   ico:'\u2728' },
+    { id:'mimic8',    t:'Sparkle thief',d:'Catch 8 of ME\u2019s sparkle mimics in one run',                    ico:'\u2728' },
     { id:'tempest',   t:'Tempest',     d:'Score 60 or more on Storm difficulty',                              ico:'\uD83C\uDF2A\uFE0F' }
   ];
   function loadJSON(key, fallback){
@@ -1682,7 +1790,7 @@ if(/^https?:$/.test(location.protocol)){
     shield = perk.shield ? 1 : 0;
     score = 0; hearts = maxHearts; timeLeft = roundLen(); combo = 0; elapsed = 0; spawnT = 0;
     waveIdx = 0; paused = false; trailT = 0;
-    combo = 0; comboT = 0; bestCombo = 0; bossCleared = false; mimicsSeen = 0; mimicsCaught = 0; purseUses = 0;
+    combo = 0; comboT = 0; bestCombo = 0; bossCleared = false; mimicsCaught = 0; purseUses = 0;
     pw.magnet = 0; pw.slow = 0; pw.x2 = 0;
     runCaught = {};
     comboPill.classList.remove('on');
@@ -1882,7 +1990,9 @@ if(/^https?:$/.test(location.protocol)){
     const pwC = (elapsed > 9 ? 0.050 : 0) * (perk.pwLuck || 1);
 
     // ME sneaks in dressed as somebody's friend
-    const mimicC = (elapsed > 13 && COW_IDS.length) ? 0.035 + 0.025 * d : 0;
+    // ME is the only buddy her mimics show up for: for everyone else the
+    // feature is switched off entirely
+    const mimicC = (perk.mimicAlly && elapsed > 10 && COW_IDS.length) ? 0.05 + 0.03 * d : 0;
 
     let kind = 'friend';
     if(r < starC) kind = 'star';
@@ -1973,7 +2083,6 @@ if(/^https?:$/.test(location.protocol)){
       near: false,
       dead: false
     };
-    if(kind === 'mimic') mimicsSeen++;
     stage.appendChild(el);
     fallers.push(f);
     if(kind === 'bolt' && !reduceMotion && !noFlash){
@@ -2133,21 +2242,14 @@ if(/^https?:$/.test(location.protocol)){
       ripple(cx, cy, f.size * 1.5, 'rgba(255,150,235,.95)');
       burst(cx, cy, ['#FF8CE6','#C9A6FF','#9BE8FF','#FFF','#FFE28C'], 26);
 
-      if(perk.mimicAlly){
-        // playing as ME, her mischief is on your side
-        score += 3; combo++; comboT = comboWindow();
-        floatText('teehee! +3', cx, cy, 'star');
-        scoreVal.textContent = score;
-        drawCombo();
-        sfx.star();
-        player.classList.remove('squish'); void player.offsetWidth; player.classList.add('squish');
-      } else {
-        score = Math.max(0, score - 2);
-        combo = 0; comboT = 0; drawCombo();
-        scoreVal.textContent = score;
-        floatText('tricked you!  \u22122', cx, cy, 'mimic');
-        sfx.mischief(); buzz(HAPTIC.mimic);
-      }
+      // only ME sees these, and for her they are pure upside
+      score += 3; combo++; comboT = comboWindow();
+      floatText('teehee! +3', cx, cy, 'star');
+      scoreVal.textContent = score;
+      drawCombo();
+      sfx.mischief();
+      buzz(HAPTIC.mimic);
+      player.classList.remove('squish'); void player.offsetWidth; player.classList.add('squish');
       return;
     }
 
@@ -2548,7 +2650,7 @@ if(/^https?:$/.test(location.protocol)){
     if(score >= 100) award('score100');
     if(CHARS.every(function(c, i){ return squad[i]; })) award('allsquad');
     if(isEndless() && elapsed >= 150) award('endless150');
-    if(mimicsSeen >= 3 && mimicsCaught === 0 && score > 0) award('nomimic');
+    if(mimicsCaught >= 8) award('mimic8');
     if(diffKey === 'storm' && score >= 60) award('tempest');
     if(earned.length) saveJSON('squishBadges', badges);
 
