@@ -1135,7 +1135,7 @@ if(/^https?:$/.test(location.protocol)){
   const PW = {
     magnet: { t:'Magnet',  dur:4.2, col:'#8C6BFF', ico:'<path d="M22 74V44a28 28 0 0 1 56 0v30H60V44a10 10 0 0 0-20 0v30z" fill="#8C6BFF" stroke="#fff" stroke-width="6" stroke-linejoin="round"/><path d="M22 74h18v14H22zM60 74h18v14H60z" fill="#FF4F9A" stroke="#fff" stroke-width="5"/>' },
     slow:   { t:'Slow-mo', dur:3.6, col:'#2FCBBD', ico:'<circle cx="50" cy="52" r="34" fill="#2FCBBD" stroke="#fff" stroke-width="6"/><path d="M50 32v22l15 10" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/>' },
-    blaster:{ t:'Blaster', dur:5.0, col:'#39D9A0', ico:'<rect x="14" y="46" width="44" height="27" rx="13" fill="#39D9A0" stroke="#fff" stroke-width="6"/><path d="M29 72v13" stroke="#fff" stroke-width="8" stroke-linecap="round"/><rect x="55" y="52" width="17" height="15" rx="7" fill="#39D9A0" stroke="#fff" stroke-width="5"/><circle cx="81" cy="39" r="11" fill="#B6FFE4" stroke="#fff" stroke-width="5"/><circle cx="60" cy="21" r="6" fill="#EAFFF6" stroke="#fff" stroke-width="3.5"/>' },
+    blaster:{ t:'Blaster', dur:5.0, col:'#FF4FC3', ico:'<rect x="14" y="46" width="44" height="27" rx="13" fill="#FF4FC3" stroke="#fff" stroke-width="6"/><path d="M29 72v13" stroke="#fff" stroke-width="8" stroke-linecap="round"/><rect x="55" y="52" width="17" height="15" rx="7" fill="#FF4FC3" stroke="#fff" stroke-width="5"/><circle cx="81" cy="39" r="11" fill="#FFB6E8" stroke="#fff" stroke-width="5"/><circle cx="60" cy="21" r="6" fill="#FFE9F9" stroke="#fff" stroke-width="3.5"/>' },
     x2:     { t:'Double',  dur:5.5, col:'#FFC53C', ico:'<circle cx="50" cy="50" r="36" fill="#FFC53C" stroke="#fff" stroke-width="6"/><text x="50" y="66" font-family="Baloo 2,sans-serif" font-size="44" font-weight="800" fill="#7A4F00" text-anchor="middle">x2</text>' }
   };
   const pw = { magnet:0, slow:0, x2:0, blaster:0 };
@@ -2481,7 +2481,7 @@ if(/^https?:$/.test(location.protocol)){
           g: 260, a: 0.8,
           r: 2 + Math.random() * 3,
           life: 0.24, age: 0,
-          c: i % 2 ? '#FFFFFF' : '#39D9A0',
+          c: i % 2 ? '#FFFFFF' : '#FF4FC3',
           spin: Math.random() * 6
         });
       }
@@ -2504,10 +2504,10 @@ if(/^https?:$/.test(location.protocol)){
     drawCombo();
     f.el.remove();
     fallers.splice(idx, 1);
-    ripple(cx, cy, f.size * 1.35, 'rgba(182,255,228,.95)');
+    ripple(cx, cy, f.size * 1.35, 'rgba(255,182,232,.95)');
     burst(cx, cy, f.kind === 'bolt'
-      ? ['#FFD84D','#B6FFE4','#39D9A0','#FFF']
-      : ['#9FB4C6','#B6FFE4','#39D9A0','#FFF'], 18);
+      ? ['#FFD84D','#FFB6E8','#FF4FC3','#FFF']
+      : ['#9FB4C6','#FFB6E8','#FF4FC3','#FFF'], 18);
     floatText('pop! +' + pay, cx, cy, 'star');
     sfx.popCloud();
     buzz(HAPTIC.pop);
@@ -2552,7 +2552,7 @@ if(/^https?:$/.test(location.protocol)){
         if(ex * ex + ey * ey < 1){
           score += 1;
           scoreVal.textContent = score;
-          burst(b.x, b.y, ['#B6FFE4','#39D9A0','#FFF'], 9);
+          burst(b.x, b.y, ['#FFB6E8','#FF4FC3','#FFF'], 9);
           bossEl.classList.remove('hurt'); void bossEl.offsetWidth; bossEl.classList.add('hurt');
           sfx.bossPing();
           shots.splice(i, 1);
@@ -2571,8 +2571,8 @@ if(/^https?:$/.test(location.protocol)){
       ctx.save();
       // a soft tail, so a bubble reads as travelling rather than hovering
       const tail = ctx.createLinearGradient(b.x, b.y, b.x, b.y + r * 4.2);
-      tail.addColorStop(0, 'rgba(182,255,228,.42)');
-      tail.addColorStop(1, 'rgba(182,255,228,0)');
+      tail.addColorStop(0, 'rgba(255,143,214,.45)');
+      tail.addColorStop(1, 'rgba(255,143,214,0)');
       ctx.fillStyle = tail;
       ctx.beginPath();
       ctx.moveTo(b.x - r * 0.52, b.y);
@@ -2582,8 +2582,8 @@ if(/^https?:$/.test(location.protocol)){
       ctx.fill();
       const g = ctx.createRadialGradient(b.x - r * 0.3, b.y - r * 0.35, r * 0.08, b.x, b.y, r);
       g.addColorStop(0, 'rgba(255,255,255,.98)');
-      g.addColorStop(0.55, 'rgba(182,255,228,.80)');
-      g.addColorStop(1, 'rgba(57,217,160,.34)');
+      g.addColorStop(0.55, 'rgba(255,182,232,.84)');
+      g.addColorStop(1, 'rgba(255,79,195,.40)');
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 6.2832); ctx.fill();
       ctx.lineWidth = 2.4;
