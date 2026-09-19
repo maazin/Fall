@@ -1064,9 +1064,9 @@ if(/^https?:$/.test(location.protocol)){
                         mimicAlly:1, mimicPay:5, mimicRate:1.9, mimicTaunt:'gotcha!', night:1,
                         long:'ME\u2019s twin brother, and the two of them cannot stand each other. Her sparkle mimics turn up almost twice as often when you play as him, and every one you catch pays 5 instead of 3, because nothing in the world makes him happier than catching his sister out. No bubble luck though: he is here for her, not for the loot. His side of the plush is the night one, so the whole round plays under a dark sky with the stars out and everything falling lit up at the edges. It is the same game, it just looks like his half of it.' },
 
-    'Grandpa Herbie': { t:'Weather Ears',   d:'Rain swerves, lightning does not',
-                        veer:1, blind:1, speed:0.80, snap:0.75, reach:1.10,
-                        long:'The old dragon cannot see a thing, and neither can you while you play him: all you get is the patch of sky he can hear around himself, and past that it is near enough black. What he can hear is rain, so grey clouds that drift near him lean away and miss. Lightning is far too fast to hear coming, so it drops on him exactly as it does on everybody else and he has no warning at all. Anything falling dead overhead makes no sound to either side, so he cannot tell which way to duck and it lands on his nose. He waddles 20% slower on top of that. The hardest buddy in the game to score with.' },
+    'Grandpa Herbie': { t:'Weather Ears',   d:'Hears one cloud at a time',
+                        veer:1, blind:1, speed:0.80, snap:0.75,
+                        long:'The old dragon cannot see a thing, and neither can you while you play him: all you get is the patch of sky he can hear around himself, and past that it is near enough black. What he can hear is rain, and only once it is nearly on top of him, and only one cloud at a time. That one leans away and misses, and then his ears need a couple of seconds before they pick anything up again, so a squall mostly gets through him. Lightning is far too fast to hear at all, so it drops on him exactly as it does on everybody else with no warning. Anything falling dead overhead makes no sound to either side either, so he cannot tell which way to duck and it lands on his nose. He waddles 20% slower on top of all that.' },
 
     'Sophie':         { t:'Little Flock',   d:'Friends fall two at a time',
                         flock:0.40, speed:0.94,
@@ -1161,6 +1161,8 @@ if(/^https?:$/.test(location.protocol)){
      Auto-fire rather than a fire button, because most people play this with one
      thumb and there is nowhere on a phone to put a second control. */
   let shots = [], shotT = 0, cloudsPopped = 0;
+  let earT = 0;                 // Herbie's ears, recharging
+  const EAR_REST = 3.0;         // seconds before he can hear the next cloud
   const SHOT_GAP = 0.26;      // seconds between bubbles
   const SHOT_SPEED = 830;     // pixels a second, straight up
   const POP_PAY = { rain: 2, bolt: 3 };
@@ -1970,7 +1972,7 @@ if(/^https?:$/.test(location.protocol)){
     runCaught = {};
     if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
     app.scrollLeft = 0; app.scrollTop = 0;    // belt and braces where overflow:clip is missing
-    blindOn = !!perk.blind; lastBlindX = -999;
+    blindOn = !!perk.blind; lastBlindX = -999; earT = 0;
     sizeBlind();
     blindEl.classList.toggle('on', blindOn);
     app.classList.toggle('night', !!perk.night);
@@ -2777,6 +2779,8 @@ if(/^https?:$/.test(location.protocol)){
       drawCombo();
     }
 
+    if(earT > 0) earT = Math.max(0, earT - dt);
+
     // power-up timers
     let pwChanged = false;
     for(const k in pw){
@@ -2844,16 +2848,17 @@ if(/^https?:$/.test(location.protocol)){
         const gap = pcx - f.x;
         const strength = 250 * (perk.magnetBoost ? 1.35 : 1);
         f.x += Math.sign(gap) * Math.min(Math.abs(gap), strength * dt);
-      } else if(perk.veer && f.kind === 'rain' && f.y > pcy - H * 0.55){
-        // He hears rain coming and grey clouds give him a wide berth. Lightning
-        // is far too fast to hear, so that one is never nudged. Anything dead
-        // overhead is the other exception: with no eyes there is no telling
-        // which way to lean, so it lands on him.
+      } else if(perk.veer && f.kind === 'rain' && f.y > pcy - H * 0.22 && (f.veered || earT <= 0)){
+        // He only picks a cloud up once it is nearly on him, he only nudges it
+        // gently, and his ears need a rest afterwards, so in a squall most of
+        // them get through. Lightning is far too fast to hear at all and is
+        // never nudged. Anything dead overhead is the other exception: with no
+        // eyes there is no telling which way to lean, so it lands on him.
         const gap = (f.x + wob) - pcx;
         const ax = Math.abs(gap);
-        if(ax > ps * 0.40 && ax < ps * 2.3){
-          f.x += Math.sign(gap) * 215 * dt;
-          if(!f.veered){ f.veered = 1; sfx.whoosh(); }
+        if(ax > ps * 0.30 && ax < ps * 1.40){
+          if(!f.veered){ f.veered = 1; earT = EAR_REST; sfx.whoosh(); }
+          f.x += Math.sign(gap) * 120 * dt;
         }
       } else if(perk.pull && f.kind === 'friend'){
         const gap = pcx - f.x;
