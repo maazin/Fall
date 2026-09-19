@@ -91,6 +91,7 @@ if(/^https?:$/.test(location.protocol)){
   #app{
     position:fixed;inset:0;
     overflow:hidden;
+    overflow:clip;      /* hidden still scrolls programmatically; clip never does */
     background:linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 45%,var(--sky-low) 100%);
     touch-action:manipulation;
     cursor:default;
@@ -242,6 +243,26 @@ if(/^https?:$/.test(location.protocol)){
 
   /* ---------- stage ---------- */
   #stage{position:absolute;inset:0;z-index:20;pointer-events:none}
+
+  /* Grandpa Herbie cannot see, so neither can you. Everything outside the
+     patch of sky he can hear is close to black. It sits above the fallers and
+     below the player, so you can always find yourself. */
+  #blind{
+    position:absolute;inset:0;z-index:23;pointer-events:none;opacity:0;
+    transition:opacity .9s ease;
+    background:radial-gradient(ellipse var(--brx,180px) var(--bry,330px) at var(--bx,50%) var(--by,82%),
+      rgba(4,6,18,0) 0%,
+      rgba(4,6,18,.14) 33%,
+      rgba(4,6,18,.62) 60%,
+      rgba(4,6,18,.89) 80%,
+      rgba(4,6,18,.94) 100%);
+  }
+  #blind.on{opacity:1}
+
+  /* Devin is the night side of the flip plush. Same game, darker sky, and
+     everything falling picks up a cold rim so it still reads. */
+  #app.night .faller .art{filter:drop-shadow(0 0 11px rgba(156,209,255,.92))}
+  #app.night #player .body{filter:drop-shadow(0 0 15px rgba(156,209,255,.55))}
 
   .faller{position:absolute;left:0;top:0;will-change:transform}
   .faller .art{width:100%;height:100%;display:block;animation:wobble 1.6s ease-in-out infinite}
@@ -824,6 +845,7 @@ if(/^https?:$/.test(location.protocol)){
   <div id="flash" aria-hidden="true"></div>
 
   <div id="stage" aria-hidden="true"></div>
+  <div id="blind" aria-hidden="true"></div>
   <canvas id="fx"></canvas>
 </div>
 
@@ -1039,12 +1061,12 @@ if(/^https?:$/.test(location.protocol)){
                         long:'Bubbles drop twice as often for her and rhinestone purses are twice as likely again, which makes her the power-up buddy by a mile. Her sparkle mimics appear when you play as her, disguised as one of the cows, and each one you catch pays 3. Double tap her on the buddy screen and see who turns up.' },
 
     'Devin':          { t:'Twin Trouble',   d:'Hunts his sister\u2019s mimics',
-                        mimicAlly:1, mimicPay:5, mimicRate:1.9, mimicTaunt:'gotcha!',
-                        long:'ME\u2019s twin brother, and the two of them cannot stand each other. Her sparkle mimics turn up almost twice as often when you play as him, and every one you catch pays 5 instead of 3, because nothing in the world makes him happier than catching his sister out. No bubble luck though: he is here for her, not for the loot.' },
+                        mimicAlly:1, mimicPay:5, mimicRate:1.9, mimicTaunt:'gotcha!', night:1,
+                        long:'ME\u2019s twin brother, and the two of them cannot stand each other. Her sparkle mimics turn up almost twice as often when you play as him, and every one you catch pays 5 instead of 3, because nothing in the world makes him happier than catching his sister out. No bubble luck though: he is here for her, not for the loot. His side of the plush is the night one, so the whole round plays under a dark sky with the stars out and everything falling lit up at the edges. It is the same game, it just looks like his half of it.' },
 
-    'Grandpa Herbie': { t:'Weather Ears',   d:'Storms swerve around him',
-                        veer:1, speed:0.80, snap:0.75, reach:1.10,
-                        long:'The old dragon cannot see a thing, so he listens instead, and he has heard enough storms to know where they are going. Rain and lightning that drift anywhere near him lean away and miss. The catch is that something falling straight at him makes no sound to one side or the other, so with no eyes he has no idea which way to duck and it lands right on his nose. He waddles 20% slower than everyone else, so pick your spot early.' },
+    'Grandpa Herbie': { t:'Weather Ears',   d:'Rain swerves, lightning does not',
+                        veer:1, blind:1, speed:0.80, snap:0.75, reach:1.10,
+                        long:'The old dragon cannot see a thing, and neither can you while you play him: all you get is the patch of sky he can hear around himself, and past that it is near enough black. What he can hear is rain, so grey clouds that drift near him lean away and miss. Lightning is far too fast to hear coming, so it drops on him exactly as it does on everybody else and he has no warning at all. Anything falling dead overhead makes no sound to either side, so he cannot tell which way to duck and it lands on his nose. He waddles 20% slower on top of that. The hardest buddy in the game to score with.' },
 
     'Sophie':         { t:'Little Flock',   d:'Friends fall two at a time',
                         flock:0.40, speed:0.94,
@@ -1053,11 +1075,18 @@ if(/^https?:$/.test(location.protocol)){
 
   const NO_PERK = { t:'Squishy', d:'A good all-rounder' };
   const ME_INDEX = CHARS.map(function(c){ return c.name; }).indexOf('ME');
+  const DEVIN_INDEX = CHARS.map(function(c){ return c.name; }).indexOf('Devin');
   // ME is envious of the cows specifically, so those are the only faces she wears
   const COWS = ['Mooni', 'Blueberry Cow', 'Ronnie', 'Connor'];
   const COW_IDS = COWS.map(function(n){
     return CHARS.map(function(c){ return c.name; }).indexOf(n);
   }).filter(function(i){ return i >= 0; });
+  /* The twins are two faces of one flip plush, so only one of them is ever out.
+     Neither of them ever falls from the sky either: whichever one you are not
+     playing is folded away inside the one you are. */
+  const TWIN_IDS = [ME_INDEX, DEVIN_INDEX].filter(function(i){ return i >= 0; });
+  const FALLABLE = CHARS.map(function(c, i){ return i; })
+    .filter(function(i){ return TWIN_IDS.indexOf(i) < 0; });
   function perkOf(i){ return PERKS[CHARS[i].name] || NO_PERK; }
 
   const app = document.getElementById('app');
@@ -1085,6 +1114,8 @@ if(/^https?:$/.test(location.protocol)){
   const pauseBtn = document.getElementById('pauseBtn');
   const nightEl = document.getElementById('night');
   const starsEl = document.getElementById('stars');
+  const blindEl = document.getElementById('blind');
+  let blindOn = false, lastBlindX = -999;
   const moonEl = document.getElementById('moon');
   const sunEl = document.getElementById('sun');
   const comboPill = document.getElementById('comboPill');
@@ -1518,16 +1549,20 @@ if(/^https?:$/.test(location.protocol)){
 
   /* ---------------- layout ---------------- */
   function resize(){
+    app.scrollLeft = 0; app.scrollTop = 0;
     W = app.clientWidth; H = app.clientHeight;
     fx.width = W; fx.height = H;
     groundY = H - Math.max(64, H * 0.11) - 26;
     if(player){
       const s = playerSize();
       player.style.width = s + 'px'; player.style.height = s + 'px';
+      lastBlindX = -999;
       placePlayer();
     }
+    sizeBlind();
   }
   function playerSize(){ return Math.max(84, Math.min(140, W * 0.16)); }
+
   function fallerSize(){ return Math.max(58, Math.min(104, W * 0.115)); }
   window.addEventListener('resize', resize);
 
@@ -1549,8 +1584,7 @@ if(/^https?:$/.test(location.protocol)){
 
   /* Devin gets no tile of his own. He lives behind his sister's and shoves her
      out of the way when you tap her twice, which is roughly how they get on. */
-  const DEVIN_INDEX = CHARS.map(function(c){ return c.name; }).indexOf('Devin');
-  const TWINS = [ME_INDEX, DEVIN_INDEX].filter(function(i){ return i >= 0; });
+  const TWINS = TWIN_IDS;
 
   function fillTile(b, i){
     const c = CHARS[i], pk = PERKS[c.name] || NO_PERK;
@@ -1844,7 +1878,7 @@ if(/^https?:$/.test(location.protocol)){
     { id:'streak20',  t:'On a roll',   d:'Reach a x4 streak of 20 catches without a hit',                      ico:'\u26A1' },
     { id:'storm2',    t:'Storm rider', d:'Survive the boss untouched on Normal or Storm',                     ico:'\u26C8\uFE0F' },
     { id:'score100',  t:'Centurion',   d:'Score 100 in a single run',                                         ico:'\u2B50' },
-    { id:'allsquad',  t:'Full squad',  d:'Catch every buddy in the game at least once',                       ico:'\uD83C\uDFC6' },
+    { id:'allsquad',  t:'Full squad',  d:'Catch every buddy that falls from the sky (the twins never do)',     ico:'\uD83C\uDFC6' },
     { id:'endless150',t:'Marathon',    d:'Last two and a half minutes in Endless',                            ico:'\u23F1\uFE0F' },
     { id:'mimic8',    t:'Sparkle thief',d:'Catch 8 of ME\u2019s sparkle mimics in one run',                    ico:'\u2728' },
     { id:'popper14',  t:'Cloud buster',d:'Blast 14 clouds out of the sky in a single run',                    ico:'\uD83E\uDEE7' },
@@ -1865,10 +1899,11 @@ if(/^https?:$/.test(location.protocol)){
     CHARS.forEach(function(c, i){
       const n = squad[i] || 0;
       const pb = buddyBest[i] || 0;
+      const twin = TWIN_IDS.indexOf(i) > -1;
       const d = document.createElement('div');
-      d.className = 'sq' + (n ? '' : ' locked');
+      d.className = 'sq' + ((n || pb) ? '' : ' locked');
       d.innerHTML = '<img src="' + c.src + '" alt=""><span>' + c.name + '</span><b>' +
-        (pb ? 'best ' + pb : (n ? n + ' caught' : 'not yet')) + '</b>';
+        (pb ? 'best ' + pb : (n ? n + ' caught' : (twin ? 'never falls' : 'not yet'))) + '</b>';
       grid.appendChild(d);
     });
     const brow = document.getElementById('badgeRow');
@@ -1881,9 +1916,9 @@ if(/^https?:$/.test(location.protocol)){
       brow.appendChild(d);
     });
     const total = CHARS.reduce(function(a, c, i){ return a + (squad[i] || 0); }, 0);
-    const found = CHARS.filter(function(c, i){ return squad[i]; }).length;
+    const found = FALLABLE.filter(function(i){ return squad[i]; }).length;
     document.getElementById('squadTally').textContent =
-      found + ' of ' + CHARS.length + ' buddies met  \u00B7  ' + total + ' caught in all';
+      found + ' of ' + FALLABLE.length + ' buddies met  \u00B7  ' + total + ' caught in all';
   }
   document.getElementById('squadBtn').addEventListener('click', function(){ sfx.tap(); renderSquad(); show(screenSquad); });
   document.getElementById('squadBackBtn').addEventListener('click', function(){ sfx.tap(); show(screenTitle); });
@@ -1933,6 +1968,12 @@ if(/^https?:$/.test(location.protocol)){
     combo = 0; comboT = 0; bestCombo = 0; bossCleared = false; mimicsCaught = 0; purseUses = 0;
     pw.magnet = 0; pw.slow = 0; pw.x2 = 0; pw.blaster = 0;
     runCaught = {};
+    if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    app.scrollLeft = 0; app.scrollTop = 0;    // belt and braces where overflow:clip is missing
+    blindOn = !!perk.blind; lastBlindX = -999;
+    sizeBlind();
+    blindEl.classList.toggle('on', blindOn);
+    app.classList.toggle('night', !!perk.night);
     comboPill.classList.remove('on');
     pwRow.innerHTML = '';
     bossState = 'none'; bossT = 0; bossShots = 0; bossHurt = false;
@@ -2111,6 +2152,18 @@ if(/^https?:$/.test(location.protocol)){
     const s = playerSize();
     player.style.transform = 'translate(' + (px - s/2) + 'px,' + (groundY - s + 12) + 'px)';
     playerShadow.style.transform = 'translate(' + (px - 44) + 'px,' + (groundY + 6) + 'px)';
+    // the pocket he can hear travels with him. Only repainted once he has
+    // actually moved, so standing still costs nothing
+    if(blindOn && Math.abs(px - lastBlindX) > 3){
+      lastBlindX = px;
+      blindEl.style.setProperty('--bx', Math.round(px) + 'px');
+      blindEl.style.setProperty('--by', Math.round(groundY - s/2 + 12) + 'px');
+    }
+  }
+
+  function sizeBlind(){
+    blindEl.style.setProperty('--brx', Math.round(Math.max(150, W * 0.30)) + 'px');
+    blindEl.style.setProperty('--bry', Math.round(Math.max(290, H * 0.40)) + 'px');
   }
 
   function spawn(){
@@ -2180,12 +2233,12 @@ if(/^https?:$/.test(location.protocol)){
       // she copies a random buddy; the sparkles are the tell
       const dis = COW_IDS.length
         ? COW_IDS[(Math.random() * COW_IDS.length) | 0]
-        : (Math.random() * (CHARS.length - 1)) | 0;
+        : FALLABLE[(Math.random() * FALLABLE.length) | 0];
       el.classList.add('mimic');
       el.innerHTML = '<div class="art"><img src="' + CHARS[dis].src + '" alt="">' +
         '<span class="spk s1"></span><span class="spk s2"></span><span class="spk s3"></span></div>';
     } else if(kind === 'friend'){
-      ci = (Math.random() * CHARS.length) | 0;
+      ci = FALLABLE[(Math.random() * FALLABLE.length) | 0];
       el.innerHTML = '<div class="art"><img src="' + CHARS[ci].src + '" alt=""></div>';
     } else if(kind === 'star'){
       el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%;filter:drop-shadow(0 0 10px rgba(255,197,60,.9))">' +
@@ -2740,7 +2793,9 @@ if(/^https?:$/.test(location.protocol)){
     if(skyT <= 0){
       skyT = 0.2;
       let t;
-      if(isEndless()){
+      if(perk.night){
+        t = 1;                                   // Devin's half of the plush: night, all round
+      } else if(isEndless()){
         const cyc = (elapsed / 78) % 2;          // a full day/night cycle every 156s
         t = cyc > 1 ? 2 - cyc : cyc;
       } else {
@@ -2789,10 +2844,11 @@ if(/^https?:$/.test(location.protocol)){
         const gap = pcx - f.x;
         const strength = 250 * (perk.magnetBoost ? 1.35 : 1);
         f.x += Math.sign(gap) * Math.min(Math.abs(gap), strength * dt);
-      } else if(perk.veer && (f.kind === 'rain' || f.kind === 'bolt') && f.y > pcy - H * 0.55){
-        // He hears the storm coming and it gives him a wide berth. Anything
-        // straight overhead is the exception: with no eyes there is no telling
-        // which way to lean, so that one lands on him.
+      } else if(perk.veer && f.kind === 'rain' && f.y > pcy - H * 0.55){
+        // He hears rain coming and grey clouds give him a wide berth. Lightning
+        // is far too fast to hear, so that one is never nudged. Anything dead
+        // overhead is the other exception: with no eyes there is no telling
+        // which way to lean, so it lands on him.
         const gap = (f.x + wob) - pcx;
         const ax = Math.abs(gap);
         if(ax > ps * 0.40 && ax < ps * 2.3){
@@ -2913,6 +2969,9 @@ if(/^https?:$/.test(location.protocol)){
     shots = []; shotT = 0;
     if(bossEl){ bossEl.remove(); bossEl = null; }
     bossState = 'none';
+    blindOn = false;
+    blindEl.classList.remove('on');
+    app.classList.remove('night');
     resetSky();
     hud.classList.add('hidden');
     comboPill.classList.remove('on');
@@ -2976,7 +3035,7 @@ if(/^https?:$/.test(location.protocol)){
     if(bestCombo >= 20) award('streak20');
     if(bossCleared && hard) award('storm2');
     if(score >= 100) award('score100');
-    if(CHARS.every(function(c, i){ return squad[i]; })) award('allsquad');
+    if(FALLABLE.every(function(i){ return squad[i]; })) award('allsquad');
     if(isEndless() && elapsed >= 150) award('endless150');
     if(mimicsCaught >= 8) award('mimic8');
     if(cloudsPopped >= 14) award('popper14');
