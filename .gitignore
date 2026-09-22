@@ -1,0 +1,12 @@
+# local env / Vercel project link
+.env
+.env.*
+.vercel
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+
+node_modules
