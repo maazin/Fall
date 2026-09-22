@@ -119,11 +119,8 @@ if(/^https?:$/.test(location.protocol)){
 
       <button class="btn" id="toPickBtn">Pick my buddy!</button>
       <div class="btn-row">
-        <button class="btn ghost" id="boardBtn">My runs</button>
+        <button class="btn ghost" id="boardBtn">Scores</button>
         <button class="btn ghost" id="squadBtn">Squad book</button>
-      </div>
-      <div class="btn-row" id="globalRow">
-        <button class="btn ghost" id="globalBtn">Global board</button>
       </div>
       <label class="opt"><input type="checkbox" id="flashOpt"> Turn off lightning flashes</label>
     </div>
@@ -159,25 +156,29 @@ if(/^https?:$/.test(location.protocol)){
     </div>
   </section>
 
-  <!-- BEST RUNS -->
+  <!-- SCORES: this phone's runs and everybody's, under one roof -->
   <section class="screen hidden" id="screenBoard">
     <div class="card">
       <p class="eyebrow">Hall of squish</p>
-      <h2>Best runs</h2>
-      <ol class="board" id="boardList"></ol>
-      <div class="btn-row"><button class="btn" id="boardBackBtn">Back</button></div>
-    </div>
-  </section>
+      <h2>Scores</h2>
+      <div class="seg tabs" id="scoreTabs">
+        <button type="button" data-tab="mine" class="sel">This phone</button>
+        <button type="button" data-tab="all" id="tabAll">Everyone</button>
+      </div>
 
-  <!-- GLOBAL BOARD -->
-  <section class="screen hidden" id="screenGlobal">
-    <div class="card">
-      <p class="eyebrow">Everyone playing</p>
-      <h2>Global board</h2>
-      <div class="bfilter" id="bFilter"></div>
-      <ol class="board" id="globalList"></ol>
-      <p class="netnote" id="globalNote"></p>
-      <div class="btn-row"><button class="btn" id="globalBackBtn">Back</button></div>
+      <div id="paneMine">
+        <ol class="board" id="boardList"></ol>
+      </div>
+
+      <div id="paneAll" class="hidden">
+        <label class="bpick" for="bFilter">Buddy
+          <select id="bFilter"></select>
+        </label>
+        <ol class="board" id="globalList"></ol>
+        <p class="netnote" id="globalNote"></p>
+      </div>
+
+      <div class="btn-row"><button class="btn" id="boardBackBtn">Back</button></div>
     </div>
   </section>
 
@@ -202,8 +203,7 @@ if(/^https?:$/.test(location.protocol)){
       </div>
       <p class="netnote" id="postNote"></p>
       <div class="btn-row">
-        <button class="btn ghost" id="overBoardBtn">My runs</button>
-        <button class="btn ghost" id="overGlobalBtn">Global</button>
+        <button class="btn ghost" id="overBoardBtn">Scores</button>
         <button class="btn ghost" id="homeBtn">Home</button>
       </div>
     </div>

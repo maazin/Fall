@@ -143,7 +143,6 @@
   const screenOver = document.getElementById('screenOver');
   const screenBoard = document.getElementById('screenBoard');
   const screenSquad = document.getElementById('screenSquad');
-  const screenGlobal = document.getElementById('screenGlobal');
   const buddyGrid = document.getElementById('buddyGrid');
   const stormEl = document.getElementById('storm');
   const flashEl = document.getElementById('flash');
@@ -685,7 +684,7 @@
     document.getElementById('perkLong').textContent = pk.long || pk.d;
   }
 
-  function show(el){ [screenTitle, screenPick, screenOver, screenBoard, screenSquad, screenGlobal].forEach(function(s){ s.classList.add('hidden'); }); if(el) el.classList.remove('hidden'); }
+  function show(el){ [screenTitle, screenPick, screenOver, screenBoard, screenSquad].forEach(function(s){ s.classList.add('hidden'); }); if(el) el.classList.remove('hidden'); }
 
   document.getElementById('toPickBtn').addEventListener('click', function(){ audio(); sfx.tap(); showPerk(picked); show(screenPick); });
   document.getElementById('startBtn').addEventListener('click', function(){ sfx.tap(); begin(); });
@@ -740,14 +739,33 @@
       list.appendChild(li);
     });
   }
-  let boardFrom = screenTitle;
-  document.getElementById('boardBtn').addEventListener('click', function(){
-    sfx.tap(); boardFrom = screenTitle; renderBoard(); show(screenBoard);
+  /* Both boards live on one screen now: this phone's five best runs and the
+     shared board, behind a tab each. One button to reach them from anywhere,
+     and the tab you were last on is the one you come back to. */
+  let boardFrom = screenTitle, scoreTab = 'mine';
+  const paneMine = document.getElementById('paneMine');
+  const paneAll  = document.getElementById('paneAll');
+  const scoreTabs = document.getElementById('scoreTabs');
+
+  function setScoreTab(t){
+    scoreTab = t;
+    [].forEach.call(scoreTabs.children, function(b){ b.classList.toggle('sel', b.dataset.tab === t); });
+    paneMine.classList.toggle('hidden', t !== 'mine');
+    paneAll.classList.toggle('hidden', t !== 'all');
+    if(t === 'mine') renderBoard(); else renderGlobal();
+  }
+  [].forEach.call(scoreTabs.children, function(b){
+    b.addEventListener('click', function(){ sfx.tap(); setScoreTab(b.dataset.tab); });
   });
+
+  function openScores(from){
+    boardFrom = from;
+    setScoreTab(online() ? scoreTab : 'mine');
+    show(screenBoard);
+  }
+  document.getElementById('boardBtn').addEventListener('click', function(){ sfx.tap(); openScores(screenTitle); });
+  document.getElementById('overBoardBtn').addEventListener('click', function(){ sfx.tap(); openScores(screenOver); });
   document.getElementById('boardBackBtn').addEventListener('click', function(){ sfx.tap(); show(boardFrom); });
-  document.getElementById('overBoardBtn').addEventListener('click', function(){
-    sfx.tap(); boardFrom = screenOver; renderBoard(); show(screenBoard);
-  });
   document.getElementById('homeBtn').addEventListener('click', function(){ sfx.tap(); show(screenTitle); });
 
   /* ---------------- the shared board ----------------
@@ -767,10 +785,9 @@
   const globalNote = document.getElementById('globalNote');
 
   if(!online()){
-    const row = document.getElementById('globalRow');
-    if(row) row.style.display = 'none';
-    const og = document.getElementById('overGlobalBtn');
-    if(og) og.style.display = 'none';
+    // no API to talk to off a file:// page, so the shared half simply is not offered
+    const t = document.getElementById('tabAll');
+    if(t) t.style.display = 'none';
   }
 
   function note(el, text, kind){
@@ -833,26 +850,20 @@
 
   let boardBuddy = null;                 // null means the overall board
 
+  /* One picker rather than a chip per buddy. With nineteen of them the strip
+     was wider than the phone, and a tap-and-scroll hunt for a name the list
+     below already shows. A select is one tap, sorted, and never overflows. */
   function buildFilter(){
-    const strip = document.getElementById('bFilter');
-    if(strip.children.length) return;    // build once
-    const mk = (label, img, val) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      if(img) btn.innerHTML = '<img src="' + img + '" alt="">' + escapeText(label);
-      else { btn.className = 'allbtn'; btn.textContent = label; }
-      btn.addEventListener('click', function(){
-        boardBuddy = val;
-        [].forEach.call(strip.children, function(c){ c.classList.remove('sel'); });
-        btn.classList.add('sel');
-        sfx.tap();
-        renderGlobal();
-      });
-      strip.appendChild(btn);
-      return btn;
-    };
-    mk('All', null, null).classList.add('sel');
-    CHARS.forEach(function(c){ mk(c.name.split(' ')[0], c.src, c.name); });
+    const sel = document.getElementById('bFilter');
+    if(sel.options.length) return;       // build once
+    const all = new Option('All buddies', '');
+    sel.appendChild(all);
+    CHARS.forEach(function(c){ sel.appendChild(new Option(c.name, c.name)); });
+    sel.addEventListener('change', function(){
+      boardBuddy = sel.value || null;
+      sfx.tap();
+      renderGlobal();
+    });
   }
 
   function renderGlobal(){
@@ -893,8 +904,7 @@
             '<b>' + e.score + '</b>';
           globalList.appendChild(li);
         });
-        note(globalNote, (boardBuddy ? 'Best runs with ' + boardBuddy + '. ' : '') +
-          (playerName ? 'Posting as ' + playerName : ''));
+        note(globalNote, playerName ? 'Posting as ' + playerName : '');
       })
       .catch(function(){
         globalList.innerHTML = '<li class="empty">Board unavailable</li>';
@@ -908,17 +918,6 @@
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
     });
   }
-
-  let globalFrom = screenTitle;
-  document.getElementById('globalBtn').addEventListener('click', function(){
-    sfx.tap(); globalFrom = screenTitle; renderGlobal(); show(screenGlobal);
-  });
-  document.getElementById('overGlobalBtn').addEventListener('click', function(){
-    sfx.tap(); globalFrom = screenOver; renderGlobal(); show(screenGlobal);
-  });
-  document.getElementById('globalBackBtn').addEventListener('click', function(){
-    sfx.tap(); show(globalFrom);
-  });
 
   /* ---------------- squad book + badges ---------------- */
   const BADGES = [
