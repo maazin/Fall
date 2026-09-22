@@ -200,7 +200,7 @@
      thumb and there is nowhere on a phone to put a second control. */
   let shots = [], shotT = 0, cloudsPopped = 0;
   let mercyT = 0;               // seconds of grace after losing a heart
-  const MERCY = 1.0;            // long enough to step out of a squall, not to camp
+  const MERCY = 0.55;           // long enough to clear the cloud that just hit you
   let earT = 0;                 // Herbie's ears, recharging
   const EAR_REST = 3.0;         // seconds before he can hear the next cloud
   const SHOT_GAP = 0.26;      // seconds between bubbles
@@ -609,7 +609,7 @@
   function heightScale(){ return Math.max(0.78, Math.min(1.12, H / 800)); }
   /* a thumb is less precise than a mouse, so touch gets a little more reach */
   const coarse = window.matchMedia('(pointer: coarse)').matches;
-  function touchReach(){ return coarse ? 1.12 : 1; }
+  function touchReach(){ return coarse ? 1.06 : 1; }
 
   function fallerSize(){ return Math.max(58, Math.min(104, W * 0.115)); }
   window.addEventListener('resize', resize);
@@ -1243,7 +1243,7 @@
     const starC = 0.07 * (perk.starLuck || 1);
     const boltC = elapsed > Math.max(boltAt(), perk.grace || 0) ? 0.03 + 0.11 * stormRamp() : 0;
     const calm = perk.grace ? Math.max(5, perk.grace) : 5;
-    const rainC = (elapsed > calm ? 0.05 + 0.17 * d : 0) * (perk.rain || 1);
+    const rainC = (elapsed > calm ? 0.055 + 0.18 * d : 0) * (perk.rain || 1);
 
     // power-ups start showing up once the round has warmed up
     // rate stays roughly where it was. The fix for power-ups drowning out
@@ -1277,7 +1277,7 @@
   /* Lightning is the fastest thing in the game, so it gets a warning: a
      crackle at the top of the sky over where it is about to drop. Half a
      second is enough to step aside if you are looking, not enough to ignore. */
-  const BOLT_WARN = 0.5;
+  const BOLT_WARN = 0.32;
   function telegraphBolt(atX, s){
     const w = document.createElement('div');
     w.className = 'warn';
@@ -1365,7 +1365,7 @@
       // pixels a second, scaled to the screen height so a drop takes about the
       // same time to reach the ground on a phone as it does on a laptop
       vy: (118 + 252 * d + Math.random() * (40 + 40 * d)) * heightScale()
-          * (kind === 'bolt' ? 1.42 * (perk.bolt || 1) : 1)
+          * (kind === 'bolt' ? 1.46 * (perk.bolt || 1) : 1)
           * (kind === 'rain' ? (perk.rainFall || 1) : 1)
           * (isGift(kind) ? 0.72 : 1)
           * (perk.fall || 1),
@@ -1517,11 +1517,12 @@
     }
   }
 
-  /* Everything a lost heart does besides the heart itself. The streak halves
-     rather than dying: losing a x4 run to one cloud was the moment people put
-     the phone down, and halving keeps the multiplier in reach. */
+  /* Everything a lost heart does besides the heart itself. A hit costs you
+     two thirds of the streak rather than all of it: losing a x4 run to one
+     cloud was the moment people put the phone down, but keeping half of it
+     made the multiplier too cheap to hold. */
   function tookHit(){
-    combo = Math.floor(combo / 2); comboT = combo > 0 ? comboWindow() : 0; drawCombo();
+    combo = Math.floor(combo / 3); comboT = combo > 0 ? comboWindow() : 0; drawCombo();
     mercyT = MERCY;
     player.classList.add('mercy');
     if(perk.rally && hearts > 0){
@@ -1934,7 +1935,7 @@
       spawn();
       const d = ramp();
       const busy = (bossState === 'enter' || bossState === 'fight') ? 2.1 : 1;
-      spawnT = (1.00 - 0.58 * Math.pow(d, 0.85)) * (0.86 + Math.random() * 0.28) * busy;
+      spawnT = (1.00 - 0.605 * Math.pow(d, 0.85)) * (0.86 + Math.random() * 0.28) * busy;
     }
 
     // fallers
