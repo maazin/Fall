@@ -18,7 +18,11 @@
     { name: 'ME', src: 'assets/buddies/me.webp' },
     { name: 'Devin', src: 'assets/buddies/devin.webp' },
     { name: 'Grandpa Herbie', src: 'assets/buddies/grandpa-herbie.webp' },
-    { name: 'Sophie', src: 'assets/buddies/sophie.webp' }
+    { name: 'Sophie', src: 'assets/buddies/sophie.webp' },
+    { name: 'Carrie', src: 'assets/buddies/carrie.webp' },
+    { name: 'Butt Nugget', src: 'assets/buddies/butt-nugget.webp' },
+    { name: 'Pip', src: 'assets/buddies/pip.webp' },
+    { name: 'Pep', src: 'assets/buddies/pep.webp' }
   ];
 
   /* ---------------- buddy perks ----------------
@@ -88,7 +92,23 @@
 
     'Sophie':         { t:'Little Flock',   d:'Friends fall two at a time',
                         flock:0.40, speed:0.94,
-                        long:'A lamb never goes anywhere on her own, so four friend drops out of ten bring a second friend down beside them. Twice the squad in the sky means a much easier streak, as long as you can decide which one to run for. She ambles a little slower than the others.' }
+                        long:'A lamb never goes anywhere on her own, so four friend drops out of ten bring a second friend down beside them. Twice the squad in the sky means a much easier streak, as long as you can decide which one to run for. She ambles a little slower than the others.' },
+
+    'Carrie':         { t:'Carrot Gold',    d:'Stars pay 7 and fall more often',
+                        star:7, starLuck:1.8,
+                        long:'Stars are her thing. Every star pays 7 instead of 5, still multiplied by your streak, and they fall almost twice as often. Nothing else about her round changes, so the whole game becomes about spotting the gold and getting under it. She is the only buddy who touches what a star is worth.' },
+
+    'Butt Nugget':    { t:'Slow Day',       d:'Fewer, slower rain clouds',
+                        rain:0.75, rainFall:0.72, speed:0.92,
+                        long:'A sloth does not do weather. A quarter of the rain clouds never bother turning up, and the ones that do drift down 28% slower than everything around them, so there is always time to step out from under one. Lightning is as fast as ever, and he shuffles 8% slower himself, so the trade is fewer scares for a lazier buddy.' },
+
+    'Pip':            { t:'Power Nap',      d:'Everything falls slower, deeper slow-mo',
+                        fall:0.92, slowBoost:1.8, slowDeep:0.5,
+                        long:'She is half asleep and somehow the sky is too. Everything falls 8% slower for her all round long, and a slow-mo bubble is a proper nap: it lasts 80% longer and slows the world to half speed instead of two thirds. Nothing pays more, you just get more time to think.' },
+
+    'Pep':            { t:'Bounce Back',    d:'Losing a heart starts 3s of x2',
+                        rally:3.0,
+                        long:'Getting hit only makes her try harder. Every time she loses a heart, a three second burst of double points kicks in on the spot, the same one the x2 bubble gives you, so a bad moment turns straight into a scoring window if you keep catching through it. Shields do not count: it has to hurt.' }
   };
 
   const NO_PERK = { t:'Squishy', d:'A good all-rounder' };
@@ -179,6 +199,8 @@
      Auto-fire rather than a fire button, because most people play this with one
      thumb and there is nowhere on a phone to put a second control. */
   let shots = [], shotT = 0, cloudsPopped = 0;
+  let mercyT = 0;               // seconds of grace after losing a heart
+  const MERCY = 1.0;            // long enough to step out of a squall, not to camp
   let earT = 0;                 // Herbie's ears, recharging
   const EAR_REST = 3.0;         // seconds before he can hear the next cloud
   const SHOT_GAP = 0.26;      // seconds between bubbles
@@ -253,7 +275,7 @@
   function mix(a, b, k){ return [
     Math.round(a[0]+(b[0]-a[0])*k), Math.round(a[1]+(b[1]-a[1])*k), Math.round(a[2]+(b[2]-a[2])*k) ]; }
   function rgb(c){ return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
-  let skyT = 0;
+  let skyT = 0, lastStormOp = '';
   function paintSky(t){
     let i = 0;
     while(i < SKY.length - 2 && t > SKY[i+1].at) i++;
@@ -582,6 +604,12 @@
     sizeBlind();
   }
   function playerSize(){ return Math.max(84, Math.min(140, W * 0.16)); }
+  /* the speed curve was tuned on a ~800px tall window; shorter screens get
+     proportionally slower drops so the time-to-ground stays the same */
+  function heightScale(){ return Math.max(0.78, Math.min(1.12, H / 800)); }
+  /* a thumb is less precise than a mouse, so touch gets a little more reach */
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  function touchReach(){ return coarse ? 1.12 : 1; }
 
   function fallerSize(){ return Math.max(58, Math.min(104, W * 0.115)); }
   window.addEventListener('resize', resize);
@@ -963,8 +991,28 @@
   });
 
   /* ---------------- controls ---------------- */
-  app.addEventListener('pointermove', function(e){ if(running) targetX = e.clientX; });
-  app.addEventListener('pointerdown', function(e){ if(running) targetX = e.clientX; });
+  /* A mouse steers by hovering: the buddy goes where the cursor is. A finger
+     steers by dragging: the buddy moves as far as the thumb does, times a
+     little gain, from wherever it was. That way the thumb can sit in the bottom
+     corner instead of on top of the buddy, covering the very thing you are
+     trying to catch with. A tap on its own does nothing, so a stray touch never
+     teleports you under a cloud. */
+  const DRAG_GAIN = 1.35;
+  let dragId = -1, dragX0 = 0, dragPx0 = 0;
+  app.addEventListener('pointerdown', function(e){
+    if(!running) return;
+    if(e.pointerType === 'mouse'){ targetX = e.clientX; return; }
+    dragId = e.pointerId; dragX0 = e.clientX; dragPx0 = targetX;
+  });
+  app.addEventListener('pointermove', function(e){
+    if(!running) return;
+    if(e.pointerType === 'mouse'){ targetX = e.clientX; return; }
+    if(e.pointerId !== dragId) return;
+    targetX = dragPx0 + (e.clientX - dragX0) * DRAG_GAIN;
+  });
+  function endDrag(e){ if(e.pointerId === dragId) dragId = -1; }
+  app.addEventListener('pointerup', endDrag);
+  app.addEventListener('pointercancel', endDrag);
   window.addEventListener('keydown', function(e){
     if(e.key === 'ArrowLeft' || e.key === 'a') keyDir = -1;
     else if(e.key === 'ArrowRight' || e.key === 'd') keyDir = 1;
@@ -984,7 +1032,7 @@
     shieldCap = perk.shieldMax || 1;
     shield = perk.shield ? 1 : 0;
     score = 0; hearts = maxHearts; timeLeft = roundLen(); combo = 0; elapsed = 0; spawnT = 0;
-    waveIdx = 0; paused = false; trailT = 0;
+    waveIdx = 0; paused = false; trailT = 0; mercyT = 0; dragId = -1;
     combo = 0; comboT = 0; bestCombo = 0; bossCleared = false; mimicsCaught = 0; purseUses = 0;
     pw.magnet = 0; pw.slow = 0; pw.x2 = 0; pw.blaster = 0;
     runCaught = {};
@@ -1192,10 +1240,10 @@
     const r = Math.random();
 
     // hazard mix widens as the round goes on
-    const starC = 0.07;
+    const starC = 0.07 * (perk.starLuck || 1);
     const boltC = elapsed > Math.max(boltAt(), perk.grace || 0) ? 0.03 + 0.11 * stormRamp() : 0;
     const calm = perk.grace ? Math.max(5, perk.grace) : 5;
-    const rainC = (elapsed > calm ? 0.06 + 0.19 * d : 0) * (perk.rain || 1);
+    const rainC = (elapsed > calm ? 0.05 + 0.17 * d : 0) * (perk.rain || 1);
 
     // power-ups start showing up once the round has warmed up
     // rate stays roughly where it was. The fix for power-ups drowning out
@@ -1216,7 +1264,7 @@
     else if(r < starC + boltC + rainC + pwC + mimicC) kind = 'mimic';
 
     const atX = s/2 + Math.random() * Math.max(1, W - s);
-    spawnAt(kind, atX, s);
+    if(kind === 'bolt') telegraphBolt(atX, s); else spawnAt(kind, atX, s);
 
     // a lamb never goes anywhere by herself
     if(kind === 'friend' && perk.flock && Math.random() < perk.flock){
@@ -1224,6 +1272,25 @@
       const bx = Math.max(s/2, Math.min(W - s/2, atX + side * s * (1.15 + Math.random() * 0.55)));
       spawnAt('friend', bx, s);
     }
+  }
+
+  /* Lightning is the fastest thing in the game, so it gets a warning: a
+     crackle at the top of the sky over where it is about to drop. Half a
+     second is enough to step aside if you are looking, not enough to ignore. */
+  const BOLT_WARN = 0.5;
+  function telegraphBolt(atX, s){
+    const w = document.createElement('div');
+    w.className = 'warn';
+    w.style.left = atX + 'px';
+    w.textContent = '\u26A1';
+    stage.appendChild(w);
+    const startedAt = elapsed;
+    (function wait(){
+      if(!running && !paused){ w.remove(); return; }
+      if(elapsed - startedAt < BOLT_WARN){ requestAnimationFrame(wait); return; }
+      w.remove();
+      if(running) spawnAt('bolt', atX, s);
+    })();
   }
 
   function isGift(k){ return k === 'pheart' || k === 'pshield' || k === 'magnet' || k === 'slow' || k === 'x2' || k === 'blaster' || k === 'purse'; }
@@ -1295,8 +1362,11 @@
       el: el, kind: kind, size: s, ci: ci,
       x: atX,
       y: -s,
-      vy: (118 + 252 * d + Math.random() * (40 + 40 * d))
-          * (kind === 'bolt' ? 1.5 * (perk.bolt || 1) : 1)
+      // pixels a second, scaled to the screen height so a drop takes about the
+      // same time to reach the ground on a phone as it does on a laptop
+      vy: (118 + 252 * d + Math.random() * (40 + 40 * d)) * heightScale()
+          * (kind === 'bolt' ? 1.42 * (perk.bolt || 1) : 1)
+          * (kind === 'rain' ? (perk.rainFall || 1) : 1)
           * (isGift(kind) ? 0.72 : 1)
           * (perk.fall || 1),
       sway: (Math.random() * 2 - 1) * (kind === 'bolt' ? 10 : kind === 'mimic' ? 34 + 26 * d : 20 + 26 * d),
@@ -1447,6 +1517,20 @@
     }
   }
 
+  /* Everything a lost heart does besides the heart itself. The streak halves
+     rather than dying: losing a x4 run to one cloud was the moment people put
+     the phone down, and halving keeps the multiplier in reach. */
+  function tookHit(){
+    combo = Math.floor(combo / 2); comboT = combo > 0 ? comboWindow() : 0; drawCombo();
+    mercyT = MERCY;
+    player.classList.add('mercy');
+    if(perk.rally && hearts > 0){
+      pw.x2 = Math.max(pw.x2, perk.rally);
+      drawPowerUps();
+      floatText('bounce back! x2', px, groundY - playerSize() - 30, 'star');
+    }
+  }
+
   function hit(f){
     f.dead = true;
     const cx = f.x, cy = f.y;
@@ -1541,7 +1625,7 @@
     if(f.kind === 'bolt'){
       hearts = Math.max(0, hearts - 1);
       if(bossState === 'fight' || bossState === 'enter') bossHurt = true;
-      combo = 0; comboT = 0; drawCombo();
+      tookHit();
       drawHearts();
       if(!reduceMotion && !noFlash){ flashEl.classList.remove('zap'); void flashEl.offsetWidth; flashEl.classList.add('zap'); }
       player.classList.remove('ouch'); void player.offsetWidth; player.classList.add('ouch');
@@ -1556,7 +1640,7 @@
     if(f.kind === 'rain'){
       hearts = Math.max(0, hearts - 1);
       if(bossState === 'fight' || bossState === 'enter') bossHurt = true;
-      combo = 0; comboT = 0; drawCombo();
+      tookHit();
       drawHearts();
       player.classList.remove('ouch'); void player.offsetWidth; player.classList.add('ouch');
       floatText('oops!', cx, cy, 'bad');
@@ -1798,6 +1882,10 @@
     }
 
     if(earT > 0) earT = Math.max(0, earT - dt);
+    if(mercyT > 0){
+      mercyT = Math.max(0, mercyT - dt);
+      if(mercyT === 0) player.classList.remove('mercy');
+    }
 
     // power-up timers
     let pwChanged = false;
@@ -1813,7 +1901,7 @@
     // sky drifts toward night (repainted a few times a second, not every frame)
     skyT -= dt;
     if(skyT <= 0){
-      skyT = 0.2;
+      skyT = 0.4;   // a full-screen gradient repaint; twice a second is plenty
       let t;
       if(perk.night){
         t = 1;                                   // Devin's half of the plush: night, all round
@@ -1831,7 +1919,8 @@
 
     // storm darkens + wave call-outs
     const sr = stormRamp();
-    stormEl.style.opacity = (sr * 0.30).toFixed(3);
+    const so = (sr * 0.30).toFixed(3);
+    if(so !== lastStormOp){ lastStormOp = so; stormEl.style.opacity = so; }
     if(waveIdx < WAVES.length && elapsed >= WAVES[waveIdx].at){
       waveEl.textContent = WAVES[waveIdx].text;
       waveEl.classList.remove('go'); void waveEl.offsetWidth; waveEl.classList.add('go');
@@ -1845,7 +1934,7 @@
       spawn();
       const d = ramp();
       const busy = (bossState === 'enter' || bossState === 'fight') ? 2.1 : 1;
-      spawnT = (1.00 - 0.63 * Math.pow(d, 0.85)) * (0.86 + Math.random() * 0.28) * busy;
+      spawnT = (1.00 - 0.58 * Math.pow(d, 0.85)) * (0.86 + Math.random() * 0.28) * busy;
     }
 
     // fallers
@@ -1855,7 +1944,7 @@
       const f = fallers[i];
       if(!f){ continue; }
       if(f.dead){ fallers.splice(i,1); continue; }
-      if(!f.webbed) f.y += f.vy * dt * (pwActive('slow') ? 0.64 : 1);
+      if(!f.webbed) f.y += f.vy * dt * (pwActive('slow') ? (perk.slowDeep || 0.64) : 1);
       const wob = Math.sin(elapsed * 1.7 + f.phase) * f.sway;
       const dx = f.x + wob - f.size/2;
       f.el.style.transform = 'translate(' + dx + 'px,' + (f.y - f.size/2) + 'px)';
@@ -1887,7 +1976,7 @@
 
       const ddx = (f.x + wob) - pcx;
       const ddy = f.y - pcy;
-      const rr = (f.size + ps) * 0.40 * (perk.reach || 1);
+      const rr = (f.size + ps) * 0.40 * (perk.reach || 1) * touchReach();
 
       // near miss on a hazard: skill reward for cutting it fine
       if(!f.near && (f.kind === 'rain' || f.kind === 'bolt')){
@@ -1902,6 +1991,9 @@
       }
 
       if(ddx*ddx + ddy*ddy < rr*rr){
+        // just been hit: clouds pass through for a moment so two in a row
+        // cannot take two hearts before there is any chance to move
+        if(mercyT > 0 && (f.kind === 'rain' || f.kind === 'bolt') && !(f.kind === 'bolt' && perk.boltImmune)) continue;
         f.x = f.x + wob;
         hit(f);
         const j = fallers.indexOf(f);

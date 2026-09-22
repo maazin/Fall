@@ -233,6 +233,18 @@ body{
 }
 #player.ouch{animation:ouch .5s ease}
 @keyframes ouch{0%,100%{filter:none}25%,75%{filter:saturate(.2) brightness(1.3)}}
+/* the grace window after a hit: clouds pass through while she blinks */
+#player.mercy .body{animation:mercy .25s steps(2,end) infinite}
+@keyframes mercy{0%{opacity:1}100%{opacity:.45}}
+
+/* lightning warning: a crackle at the top of the sky over where it will drop */
+.warn{
+  position:absolute;top:calc(8px + env(safe-area-inset-top));z-index:30;pointer-events:none;
+  font-size:34px;line-height:1;transform:translateX(-50%);
+  filter:drop-shadow(0 0 8px rgba(255,216,77,.95));
+  animation:warnPulse .25s ease-in-out infinite alternate;
+}
+@keyframes warnPulse{0%{transform:translateX(-50%) scale(.85);opacity:.55}100%{transform:translateX(-50%) scale(1.15);opacity:1}}
 #playerShadow{
   position:absolute;z-index:19;width:88px;height:16px;border-radius:50%;
   background:rgba(75,42,85,.18);filter:blur(3px);
@@ -760,7 +772,12 @@ h2{
   .btn{font-size:18px;padding:11px 22px}
 }
 
+@media (pointer:coarse){
+  .faller img,#player img{filter:none}
+}
+
 @media (prefers-reduced-motion:reduce){
+  .warn{animation:none}
   .cloud,.faller .art,#overBuddy,#timePill.low,#flash.zap,#world.shake,.ring,#shieldRing,.faller.mimic img,.faller.mimic .art::before{animation:none !important}
   .card{animation:none}
 }

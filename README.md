@@ -33,6 +33,14 @@ npx vercel dev
 Any static server (`python3 -m http.server`, etc.) also works if you don't need
 the global board — the page just shows the local best-runs list.
 
+## Controls
+
+- **Mouse / trackpad:** the buddy follows the pointer.
+- **Touch:** drag anywhere — the buddy moves as far as your thumb does (×1.35), so
+  your thumb can sit in a bottom corner instead of on top of the buddy. A tap on
+  its own does nothing.
+- **Keyboard:** ← → or A / D. `P` or `Esc` pauses.
+
 ## Adding a buddy
 
 1. Drop a `.webp` into `assets/buddies/`.
