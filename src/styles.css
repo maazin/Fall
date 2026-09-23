@@ -71,6 +71,9 @@ body{
 .flower{position:absolute;bottom:2vh;width:14px;height:14px;border-radius:50%;background:#FFF;box-shadow:0 0 0 5px rgba(255,255,255,.35)}
 .flower::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--sun)}
 
+/* the shared gradient defs: present for paint-server lookups, never drawn */
+#artdefs{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
+
 #fx{position:absolute;inset:0;pointer-events:none;z-index:40}
 #world{position:absolute;inset:0;z-index:1;will-change:transform}
 /* the drifting sky lives on a leaf of its own so repainting it does not
@@ -371,7 +374,9 @@ body.noflash #flash{display:none}
   100%{opacity:0;transform:translate(-50%,-26px) scale(1)}
 }
 
-.faller.bolt .art{animation-duration:.5s;filter:drop-shadow(0 0 14px rgba(255,225,120,.95))}
+/* the cloud carries its own halo in the artwork now, so this only has to add
+   a little bloom on top rather than fake the whole glow */
+.faller.bolt .art{animation-duration:.5s;filter:drop-shadow(0 0 9px rgba(255,216,77,.8))}
 
 /* Cheryl's web: a caught-on-the-ground friend still waiting to be collected */
 .faller.webbed .art{animation:webBob .6s ease-in-out infinite}
@@ -881,7 +886,9 @@ h2{
 }
 
 @media (pointer:coarse){
-  .faller img,#player img{filter:none}
+  /* a filter under a running animation is re-rasterised every frame, so the
+     sprites drop theirs on touch devices and lean on the drawn-in shading */
+  .faller img,#player img,.faller.bolt .art{filter:none}
 }
 
 @media (prefers-reduced-motion:reduce){

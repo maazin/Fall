@@ -49,6 +49,44 @@ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
 <body>
 
 
+<!-- Shared gradients for the weather sprites. Kept in one hidden SVG rather
+     than repeated inside every cloud, because a cloud is built from scratch on
+     every spawn and this is markup that would otherwise be parsed dozens of
+     times a round. Not display:none, which breaks paint-server references in
+     some browsers. -->
+<svg id="artdefs" aria-hidden="true" focusable="false"><defs>
+  <linearGradient id="gRain" gradientUnits="userSpaceOnUse" x1="0" y1="18" x2="0" y2="74">
+    <stop offset="0" stop-color="#F0F5FF"/>
+    <stop offset=".55" stop-color="#D6E2F7"/>
+    <stop offset="1" stop-color="#AFC2E4"/>
+  </linearGradient>
+  <linearGradient id="gBolt" gradientUnits="userSpaceOnUse" x1="0" y1="10" x2="0" y2="64">
+    <stop offset="0" stop-color="#DDE0F2"/>
+    <stop offset=".5" stop-color="#B9BFDE"/>
+    <stop offset="1" stop-color="#8E96C2"/>
+  </linearGradient>
+  <linearGradient id="gBoss" gradientUnits="userSpaceOnUse" x1="0" y1="14" x2="0" y2="130">
+    <stop offset="0" stop-color="#D3D7EE"/>
+    <stop offset=".5" stop-color="#A9B0D6"/>
+    <stop offset="1" stop-color="#7B84B4"/>
+  </linearGradient>
+  <linearGradient id="gGold" gradientUnits="userSpaceOnUse" x1="30" y1="50" x2="70" y2="104">
+    <stop offset="0" stop-color="#FFF0A8"/>
+    <stop offset=".5" stop-color="#FFD84D"/>
+    <stop offset="1" stop-color="#FFA92B"/>
+  </linearGradient>
+  <linearGradient id="gGoldB" gradientUnits="userSpaceOnUse" x1="146" y1="6" x2="184" y2="66">
+    <stop offset="0" stop-color="#FFF6C8"/>
+    <stop offset=".5" stop-color="#FFD84D"/>
+    <stop offset="1" stop-color="#FF9F1C"/>
+  </linearGradient>
+  <linearGradient id="gDrop" gradientUnits="userSpaceOnUse" x1="0" y1="71" x2="0" y2="90">
+    <stop offset="0" stop-color="#9BDCFF"/>
+    <stop offset=".55" stop-color="#63B8EC"/>
+    <stop offset="1" stop-color="#3D97D6"/>
+  </linearGradient>
+</defs></svg>
+
 <div id="app">
 <div id="world">
   <div id="sky" aria-hidden="true"></div>
