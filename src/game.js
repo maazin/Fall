@@ -1363,7 +1363,6 @@
     comboBarFill.style.transform = 'scaleX(1)';
     clearPowerUps();
     clearWarns();
-    clearTips();
     trauma = 0; hitStop = 0; leanVel = 0; bobT = 0;
     world.style.transform = '';
     bossState = 'none'; bossT = 0; bossShots = 0; bossHurt = false;
@@ -1647,12 +1646,6 @@
     else if(r < starC + boltC + rainC + pwC) kind = pickPowerUp();
     else if(r < starC + boltC + rainC + pwC + mimicC) kind = 'mimic';
 
-    if(kind === 'star') tipOnce('star');
-    else if(kind === 'rain') tipOnce('rain');
-    else if(kind === 'bolt') tipOnce('bolt');
-    else if(kind === 'purse') tipOnce('purse');
-    else if(isGift(kind)) tipOnce('gift');
-
     const atX = s/2 + Math.random() * Math.max(1, W - s);
     if(kind === 'bolt') telegraphBolt(atX, s); else spawnAt(kind, atX, s);
 
@@ -1878,42 +1871,6 @@
     bossEl.style.transform = 'translate(' + (bossX - bs/2) + 'px,' + targetY + 'px)';
   }
 
-  /* ---------------- first-time tips ----------------
-     The title screen used to explain eight rules before it let you play, which
-     on a phone put the Play button below the fold and made a squishmallow game
-     feel like homework. The rules now teach themselves the first time each
-     thing actually falls, once per device, and live on the How to play screen
-     for anyone who wants the list. */
-  const tipEl = document.getElementById('tip');
-  let seenTips = loadJSON('squishTips', {});
-  let tipQueue = [], tipT = 0;
-  const TIPS = {
-    star:    ['\u2B50', 'Stars are worth 5!'],
-    rain:    ['\uD83C\uDF27\uFE0F', 'Grumpy rain costs a heart'],
-    bolt:    ['\u26A1', 'Lightning is fast \u2014 move!'],
-    gift:    ['\uD83E\uDEE7', 'Bubbles are good. Grab them!'],
-    purse:   ['\uD83D\uDC5B', 'The purse clears the screen!'],
-    combo:   ['\uD83D\uDD25', 'Keep catching for a multiplier'],
-    blaster: ['\uD83E\uDEE7', 'You shoot on your own now'],
-    web:     ['\uD83D\uDD78\uFE0F', 'Missed friends wait in the web']
-  };
-  function tipOnce(key){
-    // reduced motion still gets the lesson, just without the banner moving
-    if(!TIPS[key] || seenTips[key]) return;
-    seenTips[key] = 1;
-    saveJSON('squishTips', seenTips);
-    tipQueue.push(key);
-  }
-  function stepTips(dt){
-    if(tipT > 0){ tipT -= dt; return; }
-    if(!tipQueue.length) return;
-    const t = TIPS[tipQueue.shift()];
-    tipEl.innerHTML = '<span class="ico">' + t[0] + '</span>' + t[1];
-    tipEl.classList.remove('go'); void tipEl.offsetWidth; tipEl.classList.add('go');
-    tipT = 2.9;                 // the banner runs 2.6s; a beat of air after it
-  }
-  function clearTips(){ tipQueue = []; tipT = 0; tipEl.classList.remove('go'); }
-
   function floatText(text, x, y, cls){
     const d = document.createElement('div');
     d.className = 'float' + (cls ? ' ' + cls : '');
@@ -2068,7 +2025,6 @@
                     : f.kind === 'slow'    ? (perk.slowBoost   || 1)
                     : f.kind === 'blaster' ? (perk.blastBoost  || 1) : 1;
         pw[f.kind] = PW[f.kind].dur * boost;
-        if(f.kind === 'blaster') tipOnce('blaster');
         floatText(PW[f.kind].t + '!', cx, cy, 'star');
         burst(cx, cy, [PW[f.kind].col,'#FFF'], 22);
       }
@@ -2147,7 +2103,7 @@
     if(combo > bestCombo) bestCombo = combo;
     comboT = comboWindow();
     const tier = multiplier();
-    if(tier > wasM){ sfx.comboUp(tier); buzz(HAPTIC.comboUp); freeze(0.05); tipOnce('combo'); }
+    if(tier > wasM){ sfx.comboUp(tier); buzz(HAPTIC.comboUp); freeze(0.05); }
     const m = tier * (pwActive('x2') ? 2 : 1);
 
     if(f.kind === 'star'){
@@ -2387,7 +2343,6 @@
     placePlayer();
     stepShake(realDt);
     stepWarns(dt);
-    stepTips(realDt);
 
     // motion trail
     if(!reduceMotion){
@@ -2536,7 +2491,6 @@
       // Sticky Web: a friend that reaches the ground waits in a web for a moment
       if(perk.webTime && f.kind === 'friend' && !f.webbed && f.y > groundY - f.size * 0.1){
         f.webbed = perk.webTime;
-        tipOnce('web');
         f.vy = 0; f.sway = 0;
         f.y = groundY - f.size * 0.28;
         f.el.classList.add('webbed');
@@ -2653,7 +2607,6 @@
     comboPill.classList.remove('on');
     clearPowerUps();
     clearWarns();
-    clearTips();
     pw.magnet = 0; pw.slow = 0; pw.x2 = 0; pw.blaster = 0;
     paused = false;
     pauseEl.classList.add('hidden');

@@ -42,9 +42,7 @@ the global board — the page just shows the local best-runs list.
   its own does nothing.
 - **Keyboard:** ← → or A / D. `P` or `Esc` pauses.
 
-The rules live on the **How to play** screen, and the first time each hazard or
-bubble actually falls the game says what it does, once per device. Clearing
-`squishTips` in localStorage makes it introduce itself again.
+The rules live on the **How to play** screen, reachable from the title.
 
 ## Offline
 

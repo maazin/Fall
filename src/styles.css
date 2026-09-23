@@ -323,27 +323,6 @@ body.noflash #flash{display:none}
 }
 #wave.go{animation:waveIn 1.9s ease-out}
 
-/* First-time hints, shown once per device. Smaller than #wave and parked
-   lower, so a tip and a wave call-out never land on top of each other. */
-#tip{
-  position:absolute;left:50%;top:44%;z-index:35;pointer-events:none;
-  transform:translate(-50%,0);
-  display:flex;align-items:center;gap:9px;
-  background:var(--cream);border:4px solid #fff;border-radius:999px;
-  padding:8px 18px;box-shadow:0 5px 0 var(--shadow);
-  font-family:"Baloo 2",sans-serif;font-weight:800;
-  font-size:clamp(14px,3.4vw,19px);color:var(--plum);
-  white-space:nowrap;max-width:92vw;opacity:0;
-}
-#tip .ico{font-size:1.25em;line-height:1}
-#tip.go{animation:tipIn 2.6s cubic-bezier(.2,1.3,.4,1)}
-@keyframes tipIn{
-  0%{opacity:0;transform:translate(-50%,14px) scale(.8)}
-  9%{opacity:1;transform:translate(-50%,0) scale(1.04)}
-  15%{transform:translate(-50%,0) scale(1)}
-  84%{opacity:1;transform:translate(-50%,0) scale(1)}
-  100%{opacity:0;transform:translate(-50%,-18px) scale(.96)}
-}
 /* --- juice: screen shake ---
    Driven from the game loop as a decaying trauma value rather than one fixed
    keyframe, so a rain cloud nudges the screen and the purse rocks it, and two
@@ -907,9 +886,6 @@ h2{
 
 @media (prefers-reduced-motion:reduce){
   .warn{animation:none}
-  /* the tip still shows and still goes away; it just stops sliding */
-  #tip.go{animation:tipHold 2.6s linear}
-  @keyframes tipHold{0%,100%{opacity:0}6%,90%{opacity:1}}
   .cloud,.faller .art,#overBuddy,#timePill.low,#flash.zap,.ring,#shieldRing,
   .faller.mimic .art::before,.faller.purse::after,.pw.ending,
   #comboPill.beat,#scoreVal.bump,#boss.charging .bossArt{animation:none !important}
