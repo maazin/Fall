@@ -72,12 +72,19 @@ body{
 .flower::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--sun)}
 
 #fx{position:absolute;inset:0;pointer-events:none;z-index:40}
-#world{position:absolute;inset:0;z-index:1}
+#world{position:absolute;inset:0;z-index:1;will-change:transform}
+/* the drifting sky lives on a leaf of its own so repainting it does not
+   invalidate every sprite sitting on top of it */
+#sky{
+  position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 45%,var(--sky-low) 100%);
+}
 
 /* time of day */
 #night{
   position:absolute;inset:0;z-index:14;pointer-events:none;
-  background:#26306B;opacity:0;mix-blend-mode:multiply;
+  background:linear-gradient(180deg,#0D1338 0%,#1B2450 60%,#2A2F5E 100%);
+  opacity:0;
 }
 #stars{position:absolute;inset:0;z-index:13;pointer-events:none;opacity:0;transition:opacity 1.2s linear}
 .star-dot{position:absolute;border-radius:50%;background:#FFF8E0;animation:twinkle 3s ease-in-out infinite}
@@ -123,6 +130,9 @@ body{
   font-variant-numeric:tabular-nums;
 }
 .pill .cap{font-family:"Nunito",sans-serif;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--plum-soft)}
+#scoreVal{display:inline-block;transform-origin:50% 60%}
+#scoreVal.bump{animation:scoreBump .26s cubic-bezier(.2,1.8,.4,1)}
+@keyframes scoreBump{0%{transform:scale(1)}40%{transform:scale(1.26);color:var(--bubblegum)}100%{transform:scale(1)}}
 #comboPill{
   display:none;align-items:center;gap:7px;
   background:linear-gradient(135deg,#FF7CC0,#FF4F9A);
@@ -130,10 +140,23 @@ body{
   box-shadow:0 5px 0 var(--bubblegum-dk);
   font-family:"Baloo 2",sans-serif;font-weight:800;color:#fff;font-size:clamp(15px,2.2vw,20px);
 }
-#comboPill.on{display:flex;animation:comboPop .3s cubic-bezier(.2,1.7,.4,1)}
+/* the entry pop and the per-catch beat are separate classes, so retriggering
+   one does not restart the other */
+#comboPill.on{display:flex}
+#comboPill.pop{animation:comboPop .3s cubic-bezier(.2,1.7,.4,1)}
 @keyframes comboPop{0%{transform:scale(.6)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
 #comboBar{width:44px;height:7px;border-radius:99px;background:rgba(255,255,255,.35);overflow:hidden}
-#comboBar i{display:block;height:100%;width:100%;background:#fff;border-radius:99px}
+/* scaleX from the left rather than an animated width: this changes every
+   frame a streak is alive, and a width would relayout the pill each time */
+#comboBar i{
+  display:block;height:100%;width:100%;background:#fff;border-radius:99px;
+  transform-origin:0 50%;will-change:transform;
+}
+/* the pill leans on the colour of the tier you are on */
+#comboPill[data-m="3"]{background:linear-gradient(135deg,#B48CFF,#8C6BFF);box-shadow:0 5px 0 #5B41C4}
+#comboPill[data-m="4"]{background:linear-gradient(135deg,#FFD96B,#FF9F1C);box-shadow:0 5px 0 #C9700A}
+#comboPill.beat,#comboPill.pop.beat{animation:comboBeat .22s cubic-bezier(.2,1.7,.4,1)}
+@keyframes comboBeat{0%{transform:scale(1)}45%{transform:scale(1.13)}100%{transform:scale(1)}}
 
 #pwRow{display:flex;gap:6px;align-items:center}
 .pw{
@@ -144,6 +167,9 @@ body{
   font-variant-numeric:tabular-nums;
 }
 .pw svg{width:19px;height:19px;flex:none}
+.pw i{font-style:normal}
+.pw.ending{animation:pwEnd .5s ease-in-out infinite}
+@keyframes pwEnd{50%{transform:scale(1.09);box-shadow:0 4px 0 var(--bubblegum-dk)}}
 
 #hearts{display:flex;gap:4px;margin-left:auto}
 .heart{width:24px;height:24px;transition:transform .25s ease,opacity .25s ease}
@@ -206,15 +232,25 @@ body{
 #app.night #player .body{filter:drop-shadow(0 0 15px rgba(156,209,255,.55))}
 
 .faller{position:absolute;left:0;top:0;will-change:transform}
-.faller .art{width:100%;height:100%;display:block;animation:wobble 1.6s ease-in-out infinite}
+/* dropIn is listed second so it owns the transform for its first 280ms and
+   the endless wobble takes over once it has finished */
+.faller .art{
+  width:100%;height:100%;display:block;
+  animation:wobble 1.6s ease-in-out infinite,dropIn .28s cubic-bezier(.2,1.5,.4,1);
+}
+@keyframes dropIn{
+  0%{transform:scale(.45) rotate(-18deg);opacity:0}
+  60%{opacity:1}
+  100%{transform:scale(1) rotate(-7deg);opacity:1}
+}
 .faller img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 6px 6px rgba(75,42,85,.22))}
 @keyframes wobble{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
 
-.faller.pop{animation:pop .32s ease-out forwards}
+.faller.pop{animation:pop .32s cubic-bezier(.25,1.4,.4,1) forwards}
 @keyframes pop{
-  0%{transform:var(--tf) scale(1)}
-  40%{transform:var(--tf) scale(1.35)}
-  100%{transform:var(--tf) scale(0);opacity:0}
+  0%{transform:var(--tf) scale(1) rotate(0)}
+  40%{transform:var(--tf) scale(1.42) rotate(9deg)}
+  100%{transform:var(--tf) scale(0) rotate(26deg);opacity:0}
 }
 
 #player{
@@ -259,8 +295,8 @@ body{
 }
 #storm{
   position:absolute;inset:0;z-index:15;pointer-events:none;
-  background:linear-gradient(180deg,#2E4763 0%,#5C7590 55%,#8FA3B8 100%);
-  opacity:0;transition:opacity .8s linear;mix-blend-mode:multiply;
+  background:linear-gradient(180deg,#14243A 0%,#26384E 55%,#3A4C60 100%);
+  opacity:0;transition:opacity .8s linear;
 }
 #flash{
   position:absolute;inset:0;z-index:16;pointer-events:none;
@@ -280,17 +316,10 @@ body.noflash #flash{display:none}
   text-shadow:0 4px 0 var(--bubblegum-dk),0 0 18px rgba(255,255,255,.65);
 }
 #wave.go{animation:waveIn 1.9s ease-out}
-/* --- juice: screen shake (over-scaled so the edges never show) --- */
-#world.shake{animation:shk .4s cubic-bezier(.36,.07,.19,.97);will-change:transform}
-@keyframes shk{
-  0%{transform:scale(1.035) translate(0,0)}
-  14%{transform:scale(1.035) translate(-10px,5px)}
-  28%{transform:scale(1.035) translate(9px,-6px)}
-  43%{transform:scale(1.035) translate(-7px,-4px)}
-  58%{transform:scale(1.035) translate(6px,5px)}
-  76%{transform:scale(1.035) translate(-3px,2px)}
-  100%{transform:scale(1) translate(0,0)}
-}
+/* --- juice: screen shake ---
+   Driven from the game loop as a decaying trauma value rather than one fixed
+   keyframe, so a rain cloud nudges the screen and the purse rocks it, and two
+   hits in a row stack instead of restarting the same animation. */
 /* --- juice: catch ripple --- */
 .ring{
   position:absolute;z-index:22;pointer-events:none;border-radius:50%;
@@ -348,10 +377,17 @@ body.noflash #flash{display:none}
 }
 
 /* ME in disguise: a rainbow sheen and three twinkles she can't resist */
-/* the purse announces itself */
+/* the purse announces itself. The glint is a glow behind it that pulses on
+   opacity and scale, which the compositor can do on its own; the old version
+   animated a filter, which re-rasterised the sprite on every frame. */
 .faller.purse .art{filter:drop-shadow(0 0 16px rgba(255,63,176,1)) drop-shadow(0 0 30px rgba(255,140,230,.8));animation-duration:1.1s}
-.faller.purse{animation:purseGlint 1.3s ease-in-out infinite}
-@keyframes purseGlint{0%,100%{filter:brightness(1)}50%{filter:brightness(1.22)}}
+.faller.purse{isolation:isolate}   /* keeps the glow's z-index inside the sprite */
+.faller.purse::after{
+  content:"";position:absolute;inset:-34%;border-radius:50%;pointer-events:none;z-index:-1;
+  background:radial-gradient(circle,rgba(255,63,176,.75) 0%,rgba(255,140,230,.34) 45%,rgba(255,140,230,0) 72%);
+  animation:purseGlint 1.3s ease-in-out infinite;
+}
+@keyframes purseGlint{0%,100%{opacity:.55;transform:scale(.92)}50%{opacity:1;transform:scale(1.1)}}
 
 /* the screen-clearing shockwave */
 #blast{
@@ -368,19 +404,20 @@ body.noflash #flash{display:none}
 
 .faller.mimic .art{position:relative;animation-duration:1.05s}
 /* a rainbow halo she can't hide, because the disguise has to be beatable on sight */
+/* The halo was a blurred conic gradient spun with a transform, and the sprite
+   under it ran a hue-rotate keyframe. Both re-run a filter on every frame, on
+   every mimic on screen. A pre-soft radial glow that breathes gets the same
+   read for the cost of an opacity change. */
 .faller.mimic .art::before{
-  content:"";position:absolute;inset:-16%;border-radius:50%;
-  background:conic-gradient(#FF7CE0,#FFD86B,#8CF3B8,#8CD2FF,#C79BFF,#FF7CE0);
-  filter:blur(9px);opacity:.72;
-  animation:mimicSpin 2.2s linear infinite;
+  content:"";position:absolute;inset:-20%;border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 50%,rgba(255,255,255,.55) 0%,rgba(255,124,224,.62) 34%,
+      rgba(199,155,255,.45) 56%,rgba(140,210,255,.22) 72%,rgba(140,210,255,0) 82%);
+  opacity:.8;
+  animation:mimicGlow 1.5s ease-in-out infinite;
 }
-@keyframes mimicSpin{to{transform:rotate(360deg)}}
-.faller.mimic img{
-  filter:drop-shadow(0 0 12px rgba(255,140,230,.95)) saturate(1.35);
-  animation:mimicHue 1.6s linear infinite;
-}
-@keyframes mimicHue{0%,100%{filter:drop-shadow(0 0 12px rgba(255,140,230,.95)) saturate(1.35) hue-rotate(0deg)}
-                    50%{filter:drop-shadow(0 0 15px rgba(150,220,255,.95)) saturate(1.5) hue-rotate(22deg)}}
+@keyframes mimicGlow{0%,100%{opacity:.62;transform:scale(.94)}50%{opacity:1;transform:scale(1.1)}}
+.faller.mimic img{filter:drop-shadow(0 0 12px rgba(255,140,230,.95)) saturate(1.4)}
 .faller.mimic .spk{
   position:absolute;width:38%;height:38%;pointer-events:none;z-index:2;
   background:radial-gradient(circle at 50% 50%,#fff 0 26%,#FFC9F2 45%,rgba(255,180,240,0) 72%);
@@ -393,7 +430,7 @@ body.noflash #flash{display:none}
 @keyframes spkTwinkle{0%,100%{opacity:.6;transform:scale(.85) rotate(0deg)}
                       50%{opacity:1;transform:scale(1.35) rotate(45deg)}}
 .faller.mimic.caught .art::before{animation:none;opacity:.95}
-.faller.mimic.caught img{animation:none;filter:drop-shadow(0 0 16px rgba(255,120,220,1)) saturate(1.2)}
+.faller.mimic.caught img{filter:drop-shadow(0 0 16px rgba(255,120,220,1)) saturate(1.2)}
 .float.zap{text-shadow:0 3px 0 #8A5A00,0 0 14px rgba(255,240,170,.9)}
 .float.mimic{text-shadow:0 3px 0 #A32D8C,0 0 14px rgba(255,170,240,.9)}
 .float.close{font-size:23px;text-shadow:0 3px 0 #18988C,0 0 12px rgba(255,255,255,.7)}
@@ -795,6 +832,9 @@ h2{
 
 @media (prefers-reduced-motion:reduce){
   .warn{animation:none}
-  .cloud,.faller .art,#overBuddy,#timePill.low,#flash.zap,#world.shake,.ring,#shieldRing,.faller.mimic img,.faller.mimic .art::before{animation:none !important}
+  .cloud,.faller .art,#overBuddy,#timePill.low,#flash.zap,.ring,#shieldRing,
+  .faller.mimic .art::before,.faller.purse::after,.pw.ending,
+  #comboPill.beat,#scoreVal.bump,#boss.charging .bossArt{animation:none !important}
   .card{animation:none}
+  #world{will-change:auto}
 }

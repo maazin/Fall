@@ -190,6 +190,13 @@
   let paused = false;
   let perk = NO_PERK, maxHearts = 3, shield = 0, shieldCap = 1, shieldEl = null;
   let lastPx = 0, trailT = 0;
+  /* game feel: a trauma value that decays, squared into a shake, and a few
+     frames of near-frozen time on the big moments. Both are the cheap half of
+     what makes an arcade game feel like one. */
+  let trauma = 0, shakeX = 0, shakeY = 0, shakeR = 0, shakeSeed = Math.random() * 1000;
+  let hitStop = 0;
+  /* the buddy leans into her own movement and breathes when she is still */
+  let leanVel = 0, bobT = 0;
   let runCaught = {};
   let bestCombo = 0, bossCleared = false, mimicsCaught = 0, purseUses = 0;
   let bossEl = null, bossState = 'none', bossT = 0, bossX = 0, bossDir = 1, bossShots = 0, bossHurt = false;
@@ -274,14 +281,19 @@
   function mix(a, b, k){ return [
     Math.round(a[0]+(b[0]-a[0])*k), Math.round(a[1]+(b[1]-a[1])*k), Math.round(a[2]+(b[2]-a[2])*k) ]; }
   function rgb(c){ return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
-  let skyT = 0, lastStormOp = '';
+  let skyT = 0, lastStormOp = '', lastSky = '';
+  /* The sky used to be repainted onto #app, the element that contains the
+     whole game, so every repaint invalidated everything inside it. It has its
+     own leaf layer now: same picture, a fraction of the paint. */
+  const skyEl = document.getElementById('sky');
   function paintSky(t){
     let i = 0;
     while(i < SKY.length - 2 && t > SKY[i+1].at) i++;
     const a = SKY[i], b = SKY[i+1];
     const k = Math.max(0, Math.min(1, (t - a.at) / (b.at - a.at)));
     const c0 = mix(a.c[0], b.c[0], k), c1 = mix(a.c[1], b.c[1], k), c2 = mix(a.c[2], b.c[2], k);
-    app.style.background = 'linear-gradient(180deg,' + rgb(c0) + ' 0%,' + rgb(c1) + ' 45%,' + rgb(c2) + ' 100%)';
+    const g = 'linear-gradient(180deg,' + rgb(c0) + ' 0%,' + rgb(c1) + ' 45%,' + rgb(c2) + ' 100%)';
+    if(g !== lastSky){ lastSky = g; skyEl.style.background = g; }
     // ground and scenery follow the light
     nightEl.style.opacity = (Math.max(0, t - 0.42) / 0.58 * 0.40).toFixed(3);
     const dusk = Math.max(0, Math.min(1, (t - 0.34) / 0.30));
@@ -306,6 +318,7 @@
   }
   function resetSky(){
     skyT = 0; paintSky(0);
+    skyEl.style.background = ''; lastSky = '';
     app.style.background = '';
     nightEl.style.opacity = 0; starsEl.style.opacity = 0; moonEl.style.opacity = 0;
     sunEl.style.opacity = 1; sunEl.style.transform = 'none';
@@ -330,63 +343,164 @@
 
   /* ---------------- sound ----------------
      Everything is sine and soft triangle, routed through a warm master chain
-     with a short shimmer delay, so the game sounds like little toy chimes
-     instead of a synth test bench. No saw or square waves anywhere. */
+     with a small room reverb and a short shimmer delay, so the game sounds
+     like little toy chimes instead of a synth test bench.
+
+     The chain is two buses rather than one gain:
+
+        sfxBus   ──┬──────────────┐
+                   └─ send ─┐     │
+        musicBus ──┬────────┼─────┤
+          (duck)   └─ send ─┤     │
+                            v     v
+                     reverb + delay -> wet ─┐
+                                            v
+                                warm(lowpass) -> limiter -> out
+
+     The limiter is the important one: a x4 streak during a boss fight can
+     fire six voices in the same 20ms, and without it they sum past 1.0 and
+     crackle. Music ducks under loud effects so a catch is always audible. */
   let ac = null, muted = false;
-  let master = null, noiseBuf = null;
+  let sfxBus = null, musicBus = null, musicDuck = null, noiseBuf = null, verbBuf = null;
+  let resumePending = false;
+
+  try{ muted = localStorage.getItem('squishMuted') === '1'; }catch(e){}
 
   function audio(){
     if(!ac){
       try{ ac = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; }
       buildChain();
     }
-    if(ac.state === 'suspended') ac.resume();
+    /* resume() is a promise, and calling it from every single blip is hundreds
+       of wasted calls a round. One in flight at a time is enough, and it still
+       recovers if the context is suspended again later (a phone locking). */
+    if(ac.state === 'suspended' && !resumePending){
+      resumePending = true;
+      const done = function(){ resumePending = false; };
+      try{ const pr = ac.resume(); if(pr && pr.then) pr.then(done, done); else done(); }
+      catch(e){ done(); }
+    }
     return ac;
   }
 
+  /* a small, bright room. Generated rather than fetched so the game stays a
+     folder of text files with no binary audio to download. */
+  function makeImpulse(seconds, decay, bright){
+    const n = (ac.sampleRate * seconds) | 0;
+    const buf = ac.createBuffer(2, n, ac.sampleRate);
+    for(let ch = 0; ch < 2; ch++){
+      const d = buf.getChannelData(ch);
+      let lp = 0;
+      for(let i = 0; i < n; i++){
+        const t = i / n;
+        // a touch of early-reflection sparkle in the first 60ms
+        const early = t < 0.04 ? 1 + Math.random() * 0.6 : 1;
+        const white = Math.random() * 2 - 1;
+        lp += (white - lp) * bright;       // one-pole tilt, keeps it from hissing
+        d[i] = lp * Math.pow(1 - t, decay) * early;
+      }
+    }
+    return buf;
+  }
+
   function buildChain(){
-    master = ac.createGain(); master.gain.value = 0.85;
+    // final safety net, so overlapping voices compress instead of clipping
+    const limiter = ac.createDynamicsCompressor();
+    limiter.threshold.value = -9;
+    limiter.knee.value = 8;
+    limiter.ratio.value = 11;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.18;
+    limiter.connect(ac.destination);
 
     // takes the glassy edge off every voice
     const warm = ac.createBiquadFilter();
-    warm.type = 'lowpass'; warm.frequency.value = 5600; warm.Q.value = 0.5;
+    warm.type = 'lowpass'; warm.frequency.value = 6200; warm.Q.value = 0.4;
+    warm.connect(limiter);
 
-    // a quiet, short echo. This is most of what makes small blips sound sweet
+    const preMaster = ac.createGain(); preMaster.gain.value = 0.80;
+    preMaster.connect(warm);
+
+    // --- wet: a small room, plus the quiet shimmer echo the game had before
+    const verb = ac.createConvolver();
+    verbBuf = makeImpulse(1.5, 2.6, 0.32);
+    verb.buffer = verbBuf;
+    const verbWet = ac.createGain(); verbWet.gain.value = 0.26;
+    verb.connect(verbWet); verbWet.connect(warm);
+
     const hp = ac.createBiquadFilter();
     hp.type = 'highpass'; hp.frequency.value = 600;
     const dl = ac.createDelay(0.6); dl.delayTime.value = 0.115;
-    const fb = ac.createGain(); fb.gain.value = 0.24;
-    const wet = ac.createGain(); wet.gain.value = 0.19;
+    const fb = ac.createGain(); fb.gain.value = 0.22;
+    const dlWet = ac.createGain(); dlWet.gain.value = 0.16;
+    hp.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(dlWet); dlWet.connect(warm);
 
-    master.connect(warm); warm.connect(ac.destination);
-    master.connect(hp); hp.connect(dl);
-    dl.connect(fb); fb.connect(dl);
-    dl.connect(wet); wet.connect(ac.destination);
+    // --- buses
+    sfxBus = ac.createGain(); sfxBus.gain.value = 1.0;
+    sfxBus.connect(preMaster);
+    const sfxSend = ac.createGain(); sfxSend.gain.value = 0.42;
+    sfxBus.connect(sfxSend); sfxSend.connect(verb); sfxSend.connect(hp);
 
-    // a little noise for soft pops and airy sweeps
+    musicDuck = ac.createGain(); musicDuck.gain.value = 1;
+    musicBus = ac.createGain(); musicBus.gain.value = 0.52;
+    musicBus.connect(musicDuck); musicDuck.connect(preMaster);
+    const musSend = ac.createGain(); musSend.gain.value = 0.30;
+    musicDuck.connect(musSend); musSend.connect(verb);
+
+    // a little noise for soft pops, shakers and airy sweeps
     const n = (ac.sampleRate * 0.5) | 0;
     noiseBuf = ac.createBuffer(1, n, ac.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for(let k = 0; k < n; k++) d[k] = Math.random() * 2 - 1;
   }
 
+  /* pull the music down for a moment so a big effect reads over the top of it.
+     amount 0 is no duck, 1 is a full dip. */
+  function duck(amount, hold){
+    if(!musicDuck || muted) return;
+    const t = ac.currentTime;
+    const floorG = Math.max(0.28, 1 - amount * 0.72);
+    musicDuck.gain.cancelScheduledValues(t);
+    musicDuck.gain.setValueAtTime(musicDuck.gain.value, t);
+    musicDuck.gain.linearRampToValueAtTime(floorG, t + 0.02);
+    musicDuck.gain.setValueAtTime(floorG, t + (hold || 0.06));
+    musicDuck.gain.linearRampToValueAtTime(1, t + (hold || 0.06) + 0.30);
+  }
+
+  /* where on screen a sound happened, as a stereo position. Sounds that have
+     no place on screen pass nothing and stay in the middle. */
+  function panFor(x){
+    if(x === undefined || x === null || !W) return 0;
+    return Math.max(-0.78, Math.min(0.78, (x / W) * 2 - 1) * 0.78);
+  }
+
   /* one round bell-ish voice: sine body, quiet octave on top,
-     optional scoop into the note and gentle vibrato */
+     optional scoop into the note, gentle vibrato and a stereo position */
   function blip(freq, at, dur, vol, opt){
-    const a = audio(); if(!a || muted) return;
+    const a = audio(); if(!a || muted || !sfxBus) return;
     opt = opt || {};
     const t = a.currentTime + at;
     const bend = opt.bend === undefined ? 0.75 : opt.bend;
+    // a few cents of drift stops a repeated note sounding machine-stamped
+    const f0 = freq * (1 + (Math.random() - 0.5) * 0.006);
+
+    let out = sfxBus;
+    if(opt.pan && a.createStereoPanner){
+      const p = a.createStereoPanner();
+      p.pan.value = opt.pan;
+      p.connect(sfxBus);
+      out = p;
+    }
 
     const osc = a.createOscillator(), g = a.createGain();
     osc.type = opt.type || 'sine';
-    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.setValueAtTime(f0, t);
     if(opt.to) osc.frequency.exponentialRampToValueAtTime(Math.max(30, opt.to), t + dur * bend);
 
     if(opt.vib){
       const lfo = a.createOscillator(), lg = a.createGain();
       lfo.frequency.value = opt.vib;
-      lg.gain.value = freq * 0.02;
+      lg.gain.value = f0 * 0.02;
       lfo.connect(lg); lg.connect(osc.frequency);
       lfo.start(t); lfo.stop(t + dur + 0.06);
     }
@@ -394,28 +508,29 @@
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + (opt.attack || 0.012));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    osc.connect(g); g.connect(master);
+    osc.connect(g); g.connect(out);
     osc.start(t); osc.stop(t + dur + 0.07);
 
     // the octave is what reads as "toy xylophone" rather than "beep"
     if(opt.harm !== 0){
       const o2 = a.createOscillator(), g2 = a.createGain();
       o2.type = 'sine';
-      o2.frequency.setValueAtTime(freq * 2, t);
+      o2.frequency.setValueAtTime(f0 * 2, t);
       if(opt.to) o2.frequency.exponentialRampToValueAtTime(Math.max(60, opt.to * 2), t + dur * bend);
       g2.gain.setValueAtTime(0.0001, t);
       g2.gain.exponentialRampToValueAtTime(vol * 0.28, t + 0.009);
       g2.gain.exponentialRampToValueAtTime(0.0001, t + dur * 0.5);
-      o2.connect(g2); g2.connect(master);
+      o2.connect(g2); g2.connect(out);
       o2.start(t); o2.stop(t + dur + 0.07);
     }
   }
 
   /* soft airy transient: the squish, the puff, the whoosh */
-  function puff(at, dur, vol, f0, f1){
-    const a = audio(); if(!a || muted || !noiseBuf) return;
+  function puff(at, dur, vol, f0, f1, pan){
+    const a = audio(); if(!a || muted || !noiseBuf || !sfxBus) return;
     const t = a.currentTime + at;
     const src = a.createBufferSource(); src.buffer = noiseBuf;
+    src.playbackRate.value = 0.9 + Math.random() * 0.2;
     const bp = a.createBiquadFilter();
     bp.type = 'bandpass'; bp.Q.value = 1.2;
     bp.frequency.setValueAtTime(f0, t);
@@ -424,8 +539,29 @@
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.014);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(bp); bp.connect(g); g.connect(master);
+
+    let out = sfxBus;
+    if(pan && a.createStereoPanner){
+      const p = a.createStereoPanner(); p.pan.value = pan; p.connect(sfxBus); out = p;
+    }
+    src.connect(bp); bp.connect(g); g.connect(out);
     src.start(t); src.stop(t + dur + 0.05);
+  }
+
+  /* a low, round thump. Used for the kick and for anything that should land
+     in your chest rather than your ears. */
+  function thump(at, freq, dur, vol){
+    const a = audio(); if(!a || muted || !sfxBus) return;
+    const t = a.currentTime + at;
+    const osc = a.createOscillator(), g = a.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq * 2.6, t);
+    osc.frequency.exponentialRampToValueAtTime(freq, t + dur * 0.45);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g); g.connect(sfxBus);
+    osc.start(t); osc.stop(t + dur + 0.05);
   }
 
   // kept for the results screen's star pings
@@ -437,12 +573,14 @@
 
   const sfx = {
     // the sound you hear hundreds of times a round: soft marimba boop that
-    // climbs the scale as your streak grows
-    catch(c){
+    // climbs the scale as your streak grows, and comes from where you caught it
+    catch(c, x){
+      const p = panFor(x);
       const f = PENTA[Math.min(Math.max(c, 1) - 1, PENTA.length - 1)];
-      puff(0, 0.055, 0.085, 1900, 700);
-      blip(f * 0.94, 0, 0.26, 0.115, { to: f, bend: 0.10 });
-      blip(f * 1.5, 0.035, 0.16, 0.045, { harm: 0 });
+      puff(0, 0.055, 0.085, 1900, 700, p);
+      blip(f * 0.94, 0, 0.26, 0.115, { to: f, bend: 0.10, pan: p });
+      blip(f * 1.5, 0.035, 0.16, 0.045, { harm: 0, pan: p });
+      duck(0.25, 0.04);
     },
     // hitting a new multiplier tier
     comboUp(m){
@@ -450,57 +588,101 @@
       [0, 4, 7].forEach(function(st, i){
         blip(base * Math.pow(2, st / 12), i * 0.045, 0.34, 0.10, { vib: 6 });
       });
+      duck(0.5, 0.12);
     },
-    star(){
+    star(x){
+      const p = panFor(x);
       [1046.50, 1318.51, 1567.98, 2093.00].forEach(function(f, i){
-        blip(f, i * 0.055, 0.42 - i * 0.05, 0.105 - i * 0.012, { attack: 0.006 });
+        blip(f, i * 0.055, 0.42 - i * 0.05, 0.105 - i * 0.012, { attack: 0.006, pan: p });
       });
-      puff(0.02, 0.3, 0.065, 4200, 1400);
+      puff(0.02, 0.3, 0.065, 4200, 1400, p);
+      duck(0.55, 0.16);
     },
     // a small disappointed "aww", not a buzz
-    bad(){
-      puff(0, 0.13, 0.105, 700, 220);
-      blip(392.00, 0,     0.30, 0.115, { to: 349.23, type:'triangle', vib: 7 });
-      blip(311.13, 0.145, 0.38, 0.100, { to: 277.18, type:'triangle', vib: 6 });
+    bad(x){
+      const p = panFor(x);
+      puff(0, 0.13, 0.105, 700, 220, p);
+      blip(392.00, 0,     0.30, 0.115, { to: 349.23, type:'triangle', vib: 7, pan: p });
+      blip(311.13, 0.145, 0.38, 0.100, { to: 277.18, type:'triangle', vib: 6, pan: p });
+      thump(0, 90, 0.20, 0.10);
+      duck(0.7, 0.2);
     },
     // lightning: a quick startled swoop plus a crackle, still soft
-    zap(){
-      puff(0, 0.17, 0.145, 3200, 500);
-      blip(880, 0, 0.22, 0.110, { to: 220, bend: 0.45, type:'triangle' });
-      blip(261.63, 0.11, 0.34, 0.080, { vib: 11, type:'triangle' });
+    zap(x){
+      const p = panFor(x);
+      puff(0, 0.17, 0.145, 3200, 500, p);
+      blip(880, 0, 0.22, 0.110, { to: 220, bend: 0.45, type:'triangle', pan: p });
+      blip(261.63, 0.11, 0.34, 0.080, { vib: 11, type:'triangle', pan: p });
+      thump(0.01, 70, 0.28, 0.14);
+      duck(0.8, 0.22);
+    },
+    // a friend slipping past: one soft descending note, quiet enough to ignore
+    miss(x){
+      const p = panFor(x);
+      puff(0, 0.10, 0.035, 900, 380, p);
+      blip(329.63, 0, 0.20, 0.045, { to: 261.63, bend: 0.6, harm: 0, pan: p });
     },
     tick(){
       puff(0, 0.030, 0.105, 2800, 1700);
       blip(1318.51, 0, 0.07, 0.075, { harm: 0 });
     },
+    // the last few seconds: the same tick, but it leans on you
+    tickHot(){
+      puff(0, 0.035, 0.13, 3000, 1500);
+      blip(1567.98, 0, 0.09, 0.095, { harm: 0 });
+      blip(783.99, 0, 0.14, 0.050, { type:'triangle', harm: 0 });
+      duck(0.35, 0.05);
+    },
     go(){
       [523.25, 659.25, 783.99].forEach(function(f, i){ blip(f, i * 0.075, 0.24, 0.12); });
       blip(1046.50, 0.225, 0.55, 0.13, { vib: 5 });
+      thump(0.225, 110, 0.35, 0.12);
     },
     tap(){
       puff(0, 0.045, 0.08, 2400, 950);
       blip(698.46, 0, 0.10, 0.085, { to: 1174.66, bend: 0.45 });
     },
     // near miss: pure air, no pitch, so it never competes with the music
-    whoosh(){ puff(0, 0.26, 0.20, 420, 2600); blip(392, 0.02, 0.2, 0.03, { to: 660, harm: 0 }); },
-    // firing a bubble: a tiny upward bloop. Quiet, because you hear it a lot
-    blast(){
-      puff(0, 0.05, 0.045, 2400, 1300);
-      blip(784, 0, 0.09, 0.05, { to: 1318, bend: 0.55, harm: 0 });
+    whoosh(x){
+      const p = panFor(x);
+      puff(0, 0.26, 0.20, 420, 2600, p);
+      blip(392, 0.02, 0.2, 0.03, { to: 660, harm: 0, pan: p });
+    },
+    // firing a bubble: a tiny upward bloop. Quiet, because you hear it a lot,
+    // and it wanders a little in pitch so a burst never machine-guns
+    blast(x){
+      const p = panFor(x);
+      const w = 0.94 + Math.random() * 0.14;
+      puff(0, 0.05, 0.040, 2400, 1300, p);
+      blip(784 * w, 0, 0.09, 0.045, { to: 1318 * w, bend: 0.55, harm: 0, pan: p });
     },
     // a cloud bursting: wet pop, then a sweet little note on top
-    popCloud(){
-      puff(0, 0.10, 0.08, 1400, 380);
-      blip(659.25, 0.01, 0.22, 0.095, { to: 987.77, bend: 0.2 });
+    popCloud(x){
+      const p = panFor(x);
+      puff(0, 0.10, 0.08, 1400, 380, p);
+      blip(659.25, 0.01, 0.22, 0.095, { to: 987.77, bend: 0.2, pan: p });
     },
     // a bubble landing on the boss: soft tick, no melody, it happens in bursts
-    bossPing(){ puff(0, 0.06, 0.05, 1900, 900); blip(1046.5, 0, 0.07, 0.035, { harm: 0 }); },
+    bossPing(x){
+      const p = panFor(x);
+      puff(0, 0.06, 0.05, 1900, 900, p);
+      blip(1046.5, 0, 0.07, 0.035, { harm: 0, pan: p });
+    },
+    // the big storm arriving: a low roll that swells
+    bossIn(){
+      puff(0, 1.1, 0.14, 180, 900);
+      thump(0, 58, 0.9, 0.16);
+      blip(146.83, 0.05, 0.9, 0.075, { to: 174.61, type:'triangle', vib: 4, harm: 0 });
+      duck(0.85, 0.7);
+    },
     // power-up / shield: a rising sparkle
-    shield(){
+    shield(x){
+      const p = panFor(x);
       [783.99, 1046.50, 1318.51].forEach(function(f, i){
-        blip(f, i * 0.045, 0.36 - i * 0.04, 0.10, { to: f * 1.06, bend: 0.7 });
+        blip(f, i * 0.045, 0.36 - i * 0.04, 0.10, { to: f * 1.06, bend: 0.7, pan: p });
       });
-      puff(0, 0.18, 0.065, 1600, 4000);
+      puff(0, 0.18, 0.065, 1600, 4000, p);
+      duck(0.5, 0.14);
     },
     // the purse: a glittery sweep up into a fat chime
     purse(){
@@ -510,18 +692,23 @@
       });
       blip(1567.98, 0.24, 0.75, 0.085, { vib: 5.5 });
       blip(261.63, 0.02, 0.6, 0.06, { type:'triangle', harm: 0 });
+      thump(0, 65, 0.5, 0.15);
+      duck(1, 0.5);
     },
     // ME's giggle: a cheeky little run down, with a sparkle on top
-    mischief(){
+    mischief(x){
+      const p = panFor(x);
       [880.00, 783.99, 659.25, 587.33].forEach(function(f, i){
-        blip(f, i * 0.062, 0.20, 0.10, { vib: 9 });
+        blip(f, i * 0.062, 0.20, 0.10, { vib: 9, pan: p });
       });
-      blip(1567.98, 0.03, 0.30, 0.05, { to: 1975.53, harm: 0 });
-      puff(0.02, 0.22, 0.05, 3600, 1500);
+      blip(1567.98, 0.03, 0.30, 0.05, { to: 1975.53, harm: 0, pan: p });
+      puff(0.02, 0.22, 0.05, 3600, 1500, p);
+      duck(0.45, 0.16);
     },
     wave(){
       blip(659.25, 0,     0.20, 0.11);
       blip(880.00, 0.135, 0.46, 0.12, { vib: 5 });
+      duck(0.6, 0.2);
     },
     // a proper little tune rather than a run up the scale
     fanfare(){
@@ -530,49 +717,118 @@
       [[261.63,0,.5],[329.63,.13,.5],[392.00,.26,.62]].forEach(function(n){
         blip(n[0], n[1], n[2], 0.055, { type:'triangle', harm: 0 });
       });
+      thump(0, 98, 0.4, 0.10);
+      thump(0.38, 65, 0.7, 0.12);
     }
   };
 
   /* ---------------- music ----------------
-     a small procedural loop that tightens its tempo as the storm builds */
-  const SCALE_DAY   = [0, 2, 4, 7, 9, 12, 14, 16];
-  const SCALE_NIGHT = [0, 3, 5, 7, 10, 12, 15, 17];
+     A small procedural band rather than one arpeggio. It runs on a bar clock,
+     walks a four-chord loop, and brings instruments in as the round heats up,
+     so the soundtrack tells you how much trouble you are in:
+
+       heat 0.00  bass + arpeggio            (a music box)
+       heat 0.25  + shaker on the offbeats   (it has a pulse now)
+       heat 0.50  + kick on 1 and 3          (something is coming)
+       heat 0.70  + a counter-line on top    (full band)
+
+     The storm swaps the major loop for a minor one, and the whole thing
+     tightens from 104bpm to about 152. */
+  const PROG_DAY   = [ {root:0,  sc:[0,2,4,7,9,11]},     // C  major-ish
+                       {root:9,  sc:[0,2,3,5,7,10]},     // Am
+                       {root:5,  sc:[0,2,4,7,9,11]},     // F
+                       {root:7,  sc:[0,2,4,7,9,10]} ];   // G
+  const PROG_NIGHT = [ {root:9,  sc:[0,2,3,5,7,10]},     // Am
+                       {root:5,  sc:[0,2,4,7,9,11]},     // F
+                       {root:0,  sc:[0,2,4,7,9,11]},     // C
+                       {root:7,  sc:[0,2,3,5,7,10]} ];   // Gm, the sour one
+  const ARP_PATTERN = [0, 2, 4, 5, 4, 2, 3, 1];
   const ROOT = 261.63;                       // C4
   let musicTimer = null, nextNote = 0, step = 0;
 
   function noteHz(semis){ return ROOT * Math.pow(2, semis / 12); }
 
-  function voice(freq, at, dur, vol, type){
-    const a = audio(); if(!a || muted) return;
+  /* a music voice. Separate from blip() so the band sits on its own bus and
+     can be ducked without touching the effects. */
+  function voice(freq, at, dur, vol, type, cut){
+    const a = audio(); if(!a || muted || !musicBus) return;
     const osc = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
     osc.type = type || 'triangle';
     osc.frequency.setValueAtTime(freq, at);
-    f.type = 'lowpass'; f.frequency.setValueAtTime(2200, at);
+    f.type = 'lowpass'; f.frequency.setValueAtTime(cut || 2200, at);
     g.gain.setValueAtTime(0.0001, at);
     g.gain.exponentialRampToValueAtTime(vol, at + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-    osc.connect(f); f.connect(g); g.connect(master || a.destination);
+    osc.connect(f); f.connect(g); g.connect(musicBus);
     osc.start(at); osc.stop(at + dur + 0.04);
   }
 
+  function shaker(at, vol){
+    const a = audio(); if(!a || muted || !noiseBuf || !musicBus) return;
+    const src = a.createBufferSource(); src.buffer = noiseBuf;
+    src.playbackRate.value = 1.6 + Math.random() * 0.3;
+    const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 5200;
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(vol, at + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.07);
+    src.connect(hp); hp.connect(g); g.connect(musicBus);
+    src.start(at); src.stop(at + 0.12);
+  }
+
+  function kick(at, vol){
+    const a = audio(); if(!a || muted || !musicBus) return;
+    const osc = a.createOscillator(), g = a.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, at);
+    osc.frequency.exponentialRampToValueAtTime(48, at + 0.10);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(vol, at + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.20);
+    osc.connect(g); g.connect(musicBus);
+    osc.start(at); osc.stop(at + 0.26);
+  }
+
   function scheduleMusic(){
-    const a = audio(); if(!a) return;
+    const a = audio(); if(!a || !musicBus) return;
     const heat = Math.max(0, Math.min(1, ramp()));
     const dark = stormRamp();
-    const scale = dark > 0.35 ? SCALE_NIGHT : SCALE_DAY;
-    const stepDur = 0.30 - 0.115 * heat;     // speeds up across the round
-    while(nextNote < a.currentTime + 0.35){
+    const prog = dark > 0.35 ? PROG_NIGHT : PROG_DAY;
+    const stepDur = 0.288 - 0.092 * heat;    // 104bpm -> ~152bpm in 8ths
+
+    while(nextNote < a.currentTime + 0.4){
       const at = Math.max(nextNote, a.currentTime + 0.02);
-      const i = step % 8;
-      // arpeggio up and back down
-      const idx = i < 5 ? i : 8 - i;
-      voice(noteHz(scale[idx] + 12), at, stepDur * 1.5, 0.045 + 0.02 * heat, 'triangle');
-      if(i % 4 === 0){
-        voice(noteHz(scale[0] - 12), at, stepDur * 3.2, 0.05, 'sine');
+      const i = step % 8;                     // position in the bar
+      const bar = (step / 8) | 0;
+      const ch = prog[bar % prog.length];
+      const sc = ch.sc;
+
+      // arpeggio: the music box, always present
+      const deg = ARP_PATTERN[i];
+      voice(noteHz(ch.root + sc[deg % sc.length] + 12 + (deg >= sc.length ? 12 : 0)),
+            at, stepDur * 1.6, 0.040 + 0.020 * heat, 'triangle', 2400 + 1400 * heat);
+
+      // bass: root on 1, fifth on 5, so the loop has a floor
+      if(i === 0) voice(noteHz(ch.root - 12), at, stepDur * 3.4, 0.055, 'sine', 900);
+      if(i === 4) voice(noteHz(ch.root + sc[3] - 12), at, stepDur * 2.6, 0.042, 'sine', 900);
+
+      // shaker on the offbeats once it has warmed up
+      if(heat > 0.25 && i % 2 === 1) shaker(at, 0.016 + 0.018 * heat);
+
+      // kick on 1 and 3 when things get serious
+      if(heat > 0.50 && (i === 0 || i === 4)) kick(at, 0.10 + 0.05 * heat);
+
+      // a counter-line over the top for the final stretch
+      if(heat > 0.70 && (i === 2 || i === 6)){
+        voice(noteHz(ch.root + sc[(i === 2 ? 4 : 2) % sc.length] + 24),
+              at, stepDur * 1.2, 0.026, 'sine', 4000);
       }
+
+      // the storm's sour drone
       if(i === 6 && dark > 0.5){
-        voice(noteHz(scale[2] - 5), at, stepDur * 2, 0.035, 'sawtooth');
+        voice(noteHz(ch.root + sc[2] - 5), at, stepDur * 2, 0.030, 'sawtooth', 1100);
       }
+
       nextNote += stepDur;
       step++;
     }
@@ -583,7 +839,7 @@
     stopMusic();
     step = 0;
     nextNote = a.currentTime + 0.1;
-    musicTimer = setInterval(scheduleMusic, 90);
+    musicTimer = setInterval(scheduleMusic, 80);
     scheduleMusic();
   }
   function stopMusic(){ if(musicTimer){ clearInterval(musicTimer); musicTimer = null; } }
@@ -591,9 +847,26 @@
   /* ---------------- layout ---------------- */
   function resize(){
     app.scrollLeft = 0; app.scrollTop = 0;
+    const oldW = W;
     W = app.clientWidth; H = app.clientHeight;
-    fx.width = W; fx.height = H;
+    /* the effects canvas is backed at device resolution and then drawn in CSS
+       pixels, so particles and blaster bubbles are crisp on a phone instead of
+       a 2x upscale of a 1x render. Capped at 2.5 so a 3x phone does not pay
+       for pixels nobody can see. */
+    const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    fx.width = Math.round(W * dpr);
+    fx.height = Math.round(H * dpr);
+    fx.style.width = W + 'px';
+    fx.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     groundY = H - Math.max(64, H * 0.11) - 26;
+    // rotating the phone used to leave everything in flight off the new screen
+    if(oldW && W && oldW !== W){
+      const k = W / oldW;
+      for(let i = 0; i < fallers.length; i++) fallers[i].x *= k;
+      for(let i = 0; i < shots.length; i++) shots[i].x *= k;
+      px *= k; targetX *= k; lastPx *= k;
+    }
     if(player){
       const s = playerSize();
       player.style.width = s + 'px'; player.style.height = s + 'px';
@@ -982,8 +1255,11 @@
     try{ localStorage.setItem('squishNoFlash', noFlash ? '1' : '0'); }catch(e){}
   });
 
+  // the mute button remembers what you chose last time
+  document.getElementById('muteBtn').textContent = muted ? '\uD83D\uDD07' : '\uD83D\uDD0A';
   document.getElementById('muteBtn').addEventListener('click', function(){
     muted = !muted;
+    try{ localStorage.setItem('squishMuted', muted ? '1' : '0'); }catch(e){}
     this.textContent = muted ? '🔇' : '🔊';
     if(muted) stopMusic(); else if(running) startMusic();
     if(!muted) sfx.tap();
@@ -1012,12 +1288,20 @@
   function endDrag(e){ if(e.pointerId === dragId) dragId = -1; }
   app.addEventListener('pointerup', endDrag);
   app.addEventListener('pointercancel', endDrag);
+  /* lower-cased, because e.key is 'A' under caps lock or a held shift and the
+     controls used to simply stop working */
+  function moveKey(e){
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if(k === 'ArrowLeft' || k === 'a') return -1;
+    if(k === 'ArrowRight' || k === 'd') return 1;
+    return 0;
+  }
   window.addEventListener('keydown', function(e){
-    if(e.key === 'ArrowLeft' || e.key === 'a') keyDir = -1;
-    else if(e.key === 'ArrowRight' || e.key === 'd') keyDir = 1;
+    const d = moveKey(e);
+    if(d){ keyDir = d; if(running) e.preventDefault(); }
   });
   window.addEventListener('keyup', function(e){
-    if(['ArrowLeft','a','ArrowRight','d'].indexOf(e.key) > -1) keyDir = 0;
+    if(moveKey(e)) keyDir = 0;
   });
 
   /* ---------------- game ---------------- */
@@ -1032,7 +1316,7 @@
     shield = perk.shield ? 1 : 0;
     score = 0; hearts = maxHearts; timeLeft = roundLen(); combo = 0; elapsed = 0; spawnT = 0;
     waveIdx = 0; paused = false; trailT = 0; mercyT = 0; dragId = -1;
-    combo = 0; comboT = 0; bestCombo = 0; bossCleared = false; mimicsCaught = 0; purseUses = 0;
+    comboT = 0; bestCombo = 0; bossCleared = false; mimicsCaught = 0; purseUses = 0;
     pw.magnet = 0; pw.slow = 0; pw.x2 = 0; pw.blaster = 0;
     runCaught = {};
     if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
@@ -1042,7 +1326,12 @@
     blindEl.classList.toggle('on', blindOn);
     app.classList.toggle('night', !!perk.night);
     comboPill.classList.remove('on');
-    pwRow.innerHTML = '';
+    comboPill.dataset.m = '';
+    comboBarFill.style.transform = 'scaleX(1)';
+    clearPowerUps();
+    clearWarns();
+    trauma = 0; hitStop = 0; leanVel = 0; bobT = 0;
+    world.style.transform = '';
     bossState = 'none'; bossT = 0; bossShots = 0; bossHurt = false;
     nextBossAt = isEndless() ? 32 : BOSS_AT;
     if(bossEl){ bossEl.remove(); bossEl = null; }
@@ -1120,6 +1409,11 @@
     }
   });
   window.addEventListener('blur', function(){ if(running) setPaused(true); });
+  /* blur alone misses a phone being locked or switched away from, which left
+     the round ticking down in the background. */
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden && running) setPaused(true);
+  });
 
   /* Every hazard on screen is stunned and swept away, and every friend,
      star and bubble still falling is collected where it stands. */
@@ -1160,13 +1454,13 @@
     }
 
     score += gained;
-    scoreVal.textContent = score;
+    setScore();
     purseUses++;
     floatText('\u2728 PURSE! +' + gained, W / 2, H * 0.36, 'star');
     if(zapped) floatText(zapped + ' cloud' + (zapped === 1 ? '' : 's') + ' stunned', W / 2, H * 0.46, 'close');
     sfx.purse();
     buzz(HAPTIC.purse);
-    shake();
+    shake(0.95); freeze(0.11);
   }
 
   function makeShieldRing(){
@@ -1185,22 +1479,68 @@
     setTimeout(function(){ se.remove(); }, 420);
   }
 
+  /* scaleX rather than width: this runs every frame a streak is alive, and a
+     width in percent relayouts the pill each time. A transform does not. */
   function drawCombo(){
     const m = multiplier();
-    if(m <= 1 || !running && combo === 0){ comboPill.classList.remove('on'); return; }
-    if(!comboPill.classList.contains('on')){ comboPill.classList.add('on'); }
-    comboVal.textContent = 'x' + m;
-    comboBarFill.style.width = Math.max(0, Math.min(1, comboT / comboWindow()) * 100) + '%';
+    if(m <= 1 || (!running && combo === 0)){ comboPill.classList.remove('on'); return; }
+    if(!comboPill.classList.contains('on')){
+      comboPill.classList.add('on');
+      if(!reduceMotion){ comboPill.classList.remove('pop'); void comboPill.offsetWidth; comboPill.classList.add('pop'); }
+    }
+    if(comboPill.dataset.m !== String(m)){
+      comboPill.dataset.m = String(m);
+      comboVal.textContent = 'x' + m;
+    }
+    const k = Math.max(0, Math.min(1, comboT / comboWindow()));
+    comboBarFill.style.transform = 'scaleX(' + k.toFixed(3) + ')';
+  }
+  function pulseCombo(){
+    if(reduceMotion || !comboPill.classList.contains('on')) return;
+    comboPill.classList.remove('pop');
+    comboPill.classList.remove('beat'); void comboPill.offsetWidth; comboPill.classList.add('beat');
+  }
+  /* the score is the one number people watch, so it should react */
+  function setScore(){
+    scoreVal.textContent = score;
+    if(reduceMotion) return;
+    scoreVal.classList.remove('bump'); void scoreVal.offsetWidth; scoreVal.classList.add('bump');
   }
 
-  function drawPowerUps(){
+  /* One chip per power-up, built once and then shown, hidden and counted
+     down. The old version reparsed an inline SVG every time a second ticked
+     off any active power-up, which is a few hundred SVG parses a round. */
+  const pwChips = {};
+  function buildPwChips(){
     pwRow.innerHTML = '';
     Object.keys(PW).forEach(function(k){
-      if(pw[k] <= 0) return;
       const d = document.createElement('div');
       d.className = 'pw';
-      d.innerHTML = '<svg viewBox="0 0 100 100">' + PW[k].ico + '</svg>' + Math.ceil(pw[k]);
+      d.style.display = 'none';
+      d.innerHTML = '<svg viewBox="0 0 100 100">' + PW[k].ico + '</svg><i>0</i>';
       pwRow.appendChild(d);
+      pwChips[k] = { el: d, num: d.querySelector('i'), last: -1 };
+    });
+  }
+  function drawPowerUps(){
+    Object.keys(PW).forEach(function(k){
+      const c = pwChips[k];
+      if(!c) return;
+      const left = pw[k] > 0 ? Math.ceil(pw[k]) : 0;
+      if(left === c.last) return;
+      c.last = left;
+      c.el.style.display = left ? 'flex' : 'none';
+      if(left){
+        c.num.textContent = left;
+        // the last second warns you it is about to go
+        c.el.classList.toggle('ending', left <= 1);
+      }
+    });
+  }
+  function clearPowerUps(){
+    Object.keys(pwChips).forEach(function(k){
+      pwChips[k].el.style.display = 'none';
+      pwChips[k].last = -1;
     });
   }
 
@@ -1217,8 +1557,19 @@
 
   function placePlayer(){
     const s = playerSize();
-    player.style.transform = 'translate(' + (px - s/2) + 'px,' + (groundY - s + 12) + 'px)';
-    playerShadow.style.transform = 'translate(' + (px - 44) + 'px,' + (groundY + 6) + 'px)';
+    /* She leans into her own movement and floats a little when she is still.
+       Both come off one smoothed velocity, so the tilt settles instead of
+       snapping back the instant you stop. */
+    const tilt = Math.max(-12, Math.min(12, leanVel * 0.025));
+    const bob = reduceMotion ? 0 : Math.sin(bobT * 2.3) * 3.2;
+    player.style.transform =
+      'translate(' + (px - s/2).toFixed(1) + 'px,' + (groundY - s + 12 + bob).toFixed(1) + 'px)' +
+      (reduceMotion ? '' : ' rotate(' + tilt.toFixed(2) + 'deg)');
+    // the shadow stretches the other way and fades as she floats up
+    const lift = 1 - Math.abs(bob) / 9;
+    playerShadow.style.transform =
+      'translate(' + (px - 44 + tilt * 0.9).toFixed(1) + 'px,' + (groundY + 6).toFixed(1) + 'px)' +
+      ' scale(' + (1 + Math.abs(leanVel) * 0.00035).toFixed(3) + ',' + lift.toFixed(3) + ')';
     // the pocket he can hear travels with him. Only repainted once he has
     // actually moved, so standing still costs nothing
     if(blindOn && Math.abs(px - lastBlindX) > 3){
@@ -1277,19 +1628,31 @@
      crackle at the top of the sky over where it is about to drop. Half a
      second is enough to step aside if you are looking, not enough to ignore. */
   const BOLT_WARN = 0.32;
+  let warns = [];
+  /* The old version spun its own requestAnimationFrame per pending bolt, and
+     while the game was paused that loop polled a clock that never moved. The
+     main loop already ticks; the warnings ride along on it. */
   function telegraphBolt(atX, s){
     const w = document.createElement('div');
     w.className = 'warn';
     w.style.left = atX + 'px';
     w.textContent = '\u26A1';
     stage.appendChild(w);
-    const startedAt = elapsed;
-    (function wait(){
-      if(!running && !paused){ w.remove(); return; }
-      if(elapsed - startedAt < BOLT_WARN){ requestAnimationFrame(wait); return; }
-      w.remove();
-      if(running) spawnAt('bolt', atX, s);
-    })();
+    warns.push({ el: w, t: BOLT_WARN, x: atX, size: s });
+  }
+  function stepWarns(dt){
+    for(let i = warns.length - 1; i >= 0; i--){
+      const w = warns[i];
+      w.t -= dt;
+      if(w.t > 0) continue;
+      w.el.remove();
+      warns.splice(i, 1);
+      if(running) spawnAt('bolt', w.x, w.size);
+    }
+  }
+  function clearWarns(){
+    for(let i = 0; i < warns.length; i++) warns[i].el.remove();
+    warns = [];
   }
 
   function isGift(k){ return k === 'pheart' || k === 'pshield' || k === 'magnet' || k === 'slow' || k === 'x2' || k === 'blaster' || k === 'purse'; }
@@ -1409,7 +1772,7 @@
     stage.appendChild(bossEl);
     waveEl.textContent = 'Big storm incoming!';
     waveEl.classList.remove('go'); void waveEl.offsetWidth; waveEl.classList.add('go');
-    sfx.wave(); buzz(HAPTIC.gift);
+    sfx.wave(); sfx.bossIn(); buzz(HAPTIC.gift);
   }
 
   function bossShoot(){
@@ -1452,10 +1815,11 @@
         if(!bossHurt){
           bossCleared = true;
           score += 15;
-          scoreVal.textContent = score;
+          setScore();
           floatText('storm survived! +15', W/2, H*0.34, 'star');
+          shake(0.5); freeze(0.10);
           waveEl.textContent = 'Storm survived! +15';
-          sfx.star(); buzz(HAPTIC.bossWin);
+          sfx.star(W / 2); buzz(HAPTIC.bossWin);
         } else {
           waveEl.textContent = 'Storm passed';
           sfx.wave();
@@ -1484,10 +1848,37 @@
     setTimeout(function(){ d.remove(); }, 900);
   }
 
-  function shake(){
+  /* Shake is a decaying "trauma" value squared into an offset each frame,
+     rather than one fixed keyframe. A rain cloud gives you a nudge, the purse
+     gives you an earthquake, and two hits close together stack instead of
+     restarting the same animation. */
+  function shake(amount){
     if(reduceMotion) return;
-    world.classList.remove('shake'); void world.offsetWidth; world.classList.add('shake');
-    setTimeout(function(){ world.classList.remove('shake'); }, 420);
+    trauma = Math.min(1, trauma + (amount === undefined ? 0.42 : amount));
+  }
+  function stepShake(dt){
+    if(reduceMotion) return;
+    if(trauma <= 0){
+      if(shakeX || shakeY || shakeR){ shakeX = shakeY = shakeR = 0; world.style.transform = ''; }
+      return;
+    }
+    trauma = Math.max(0, trauma - dt * 1.7);
+    const k = trauma * trauma;
+    shakeSeed += dt * 47;
+    // three different frequencies so it reads as a jolt, not a wobble
+    shakeX = Math.sin(shakeSeed * 1.00) * 17 * k;
+    shakeY = Math.sin(shakeSeed * 1.63 + 1.7) * 13 * k;
+    shakeR = Math.sin(shakeSeed * 0.81 + 3.1) * 1.15 * k;
+    // scaled up a touch so the edges of the world never show through
+    world.style.transform =
+      'translate(' + shakeX.toFixed(2) + 'px,' + shakeY.toFixed(2) + 'px) ' +
+      'rotate(' + shakeR.toFixed(3) + 'deg) scale(' + (1 + 0.022 * k).toFixed(4) + ')';
+  }
+  /* A few frames where the world almost stops. The single cheapest way to
+     make a hit land: your eye reads the pause as weight. */
+  function freeze(sec){
+    if(reduceMotion) return;
+    hitStop = Math.max(hitStop, sec);
   }
 
   function ripple(x, y, size, color){
@@ -1501,7 +1892,11 @@
     setTimeout(function(){ d.remove(); }, 520);
   }
 
-  function burst(x, y, colors, n){
+  /* shape 'spark' draws a four-point twinkle in additive blending instead of
+     a confetti chip, which is what a star or a bubble should throw off. */
+  function burst(x, y, colors, n, shape){
+    // on a phone mid-storm this is the thing that piles up, so it has a ceiling
+    if(particles.length > 420) n = Math.max(4, n >> 1);
     for(let i=0;i<n;i++){
       const a = Math.random() * Math.PI * 2;
       const sp = 90 + Math.random() * 210;
@@ -1511,8 +1906,22 @@
         r: 3 + Math.random() * 6,
         life: 0.5 + Math.random() * 0.5, age: 0,
         c: colors[(Math.random() * colors.length) | 0],
-        spin: Math.random() * 6
+        spin: Math.random() * 6,
+        shape: shape || 'chip'
       });
+    }
+    // a couple of bright twinkles on top of any burst, for the sparkle
+    if(!reduceMotion && shape !== 'spark'){
+      for(let i = 0; i < 3; i++){
+        const a = Math.random() * Math.PI * 2;
+        const sp = 40 + Math.random() * 130;
+        particles.push({
+          x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+          g: 120, r: 4 + Math.random() * 5,
+          life: 0.34 + Math.random() * 0.3, age: 0,
+          c: '#FFFFFF', spin: Math.random() * 6, shape: 'spark'
+        });
+      }
     }
   }
 
@@ -1554,9 +1963,10 @@
       const mpay = perk.mimicPay || 3;
       score += mpay; combo++; comboT = comboWindow();
       floatText((perk.mimicTaunt || 'teehee!') + ' +' + mpay, cx, cy, 'star');
-      scoreVal.textContent = score;
+      setScore();
       drawCombo();
-      sfx.mischief();
+      sfx.mischief(cx);
+      freeze(0.05);
       buzz(HAPTIC.mimic);
       player.classList.remove('squish'); void player.offsetWidth; player.classList.add('squish');
       return;
@@ -1587,7 +1997,7 @@
       }
       drawPowerUps();
       player.classList.remove('squish'); void player.offsetWidth; player.classList.add('squish');
-      sfx.shield(); buzz(HAPTIC.gift);
+      sfx.shield(cx); buzz(HAPTIC.gift); freeze(0.05); shake(0.14);
       return;
     }
 
@@ -1604,7 +2014,7 @@
         floatText(shield > 0 ? 'blocked! (1 left)' : 'blocked!', cx, cy, 'close');
         ripple(cx, cy, f.size * 1.5, 'rgba(120,222,255,.95)');
         burst(cx, cy, ['#78DEFF','#D6F5FF','#FFF'], 20);
-        sfx.shield(); buzz(HAPTIC.block);
+        sfx.shield(cx); buzz(HAPTIC.block);
         return;
       }
     }
@@ -1613,11 +2023,11 @@
       // immunity alone scored nothing, so eating lightning is income for her
       const eaten = perk.boltPay || 0;
       score += eaten;
-      if(eaten){ combo++; comboT = comboWindow(); scoreVal.textContent = score; drawCombo(); }
+      if(eaten){ combo++; comboT = comboWindow(); setScore(); drawCombo(); }
       ripple(cx, cy, f.size * 1.6, 'rgba(255,216,77,.95)');
       burst(cx, cy, ['#FFD84D','#FFF3B8','#8CD2FF','#FFF'], 22);
       floatText(eaten ? 'nom! +' + eaten : 'nom!', cx, cy, 'star');
-      sfx.shield();
+      sfx.shield(cx);
       player.classList.remove('squish'); void player.offsetWidth; player.classList.add('squish');
       return;
     }
@@ -1631,8 +2041,8 @@
       player.classList.remove('ouch'); void player.offsetWidth; player.classList.add('ouch');
       floatText('zap!', cx, cy, 'zap');
       burst(cx, cy, ['#FFD84D','#FFF3B8','#6B7C90','#FFF'], 20);
-      shake(); buzz(HAPTIC.zap);
-      sfx.zap();
+      shake(0.62); freeze(0.085); buzz(HAPTIC.zap);
+      sfx.zap(cx);
       if(hearts === 0) finish();
       return;
     }
@@ -1645,8 +2055,8 @@
       player.classList.remove('ouch'); void player.offsetWidth; player.classList.add('ouch');
       floatText('oops!', cx, cy, 'bad');
       burst(cx, cy, ['#9FB4C6','#7FC7E8','#D9EAF5'], 14);
-      shake(); buzz(HAPTIC.rain);
-      sfx.bad();
+      shake(0.34); freeze(0.06); buzz(HAPTIC.rain);
+      sfx.bad(cx);
       if(hearts === 0) finish();
       return;
     }
@@ -1660,15 +2070,16 @@
     if(combo > bestCombo) bestCombo = combo;
     comboT = comboWindow();
     const tier = multiplier();
-    if(tier > wasM){ sfx.comboUp(tier); buzz(HAPTIC.comboUp); }
+    if(tier > wasM){ sfx.comboUp(tier); buzz(HAPTIC.comboUp); freeze(0.05); }
     const m = tier * (pwActive('x2') ? 2 : 1);
 
     if(f.kind === 'star'){
       const sv = (perk.star || 5) * m;
       score += sv;
       floatText('+' + sv, cx, cy, 'star');
-      burst(cx, cy, ['#FFC53C','#FFE9A8','#FFF','#FF4F9A'], 26);
-      sfx.star();
+      burst(cx, cy, ['#FFC53C','#FFE9A8','#FFF','#FF4F9A'], 26, 'spark');
+      freeze(0.045); shake(0.16);
+      sfx.star(cx);
     } else {
       // flat and unmultiplied, so a x4 streak pays 5 rather than 8
       // a friend rescued off the ground out of Cheryl's web is worth extra
@@ -1677,11 +2088,12 @@
       score += fv;
       floatText(m > 1 ? '+' + fv + '  x' + m : '+' + fv, cx, cy);
       burst(cx, cy, ['#FF4F9A','#2FCBBD','#FFC53C','#8C6BFF','#FFF'], 16);
-      sfx.catch(combo);
+      sfx.catch(combo, cx);
       if(f.ci >= 0) runCaught[f.ci] = (runCaught[f.ci] || 0) + 1;
     }
-    scoreVal.textContent = score;
+    setScore();
     drawCombo();
+    pulseCombo();
   }
 
   /* ---------------- blaster ----------------
@@ -1716,7 +2128,7 @@
         });
       }
     }
-    sfx.blast();
+    sfx.blast(px);
   }
 
   function popCloud(f, idx){
@@ -1730,7 +2142,7 @@
     combo++;
     if(combo > bestCombo) bestCombo = combo;
     comboT = comboWindow();
-    scoreVal.textContent = score;
+    setScore();
     drawCombo();
     f.el.remove();
     fallers.splice(idx, 1);
@@ -1739,7 +2151,8 @@
       ? ['#FFD84D','#FFB6E8','#FF4FC3','#FFF']
       : ['#9FB4C6','#FFB6E8','#FF4FC3','#FFF'], 18);
     floatText('pop! +' + pay, cx, cy, 'star');
-    sfx.popCloud();
+    shake(0.13);
+    sfx.popCloud(cx);
     buzz(HAPTIC.pop);
   }
 
@@ -1781,10 +2194,10 @@
         const ey = (b.y - (bossTopY() + bs * 0.38)) / (bs * 0.26);
         if(ex * ex + ey * ey < 1){
           score += 1;
-          scoreVal.textContent = score;
+          setScore();
           burst(b.x, b.y, ['#FFB6E8','#FF4FC3','#FFF'], 9);
           bossEl.classList.remove('hurt'); void bossEl.offsetWidth; bossEl.classList.add('hurt');
-          sfx.bossPing();
+          sfx.bossPing(b.x);
           shots.splice(i, 1);
           continue;
         }
@@ -1792,36 +2205,58 @@
     }
   }
 
-  /* drawn on the effects canvas, which sits above the fallers, so a bubble
-     reads as passing in front of a cloud right up to the moment it bursts */
+  /* Drawn on the effects canvas, which sits above the fallers, so a bubble
+     reads as passing in front of a cloud right up to the moment it bursts.
+
+     The bubble is drawn once into an offscreen canvas and then stamped. Built
+     live it cost two gradients per bubble per frame, and with auto-fire there
+     are a dozen on screen at once. */
+  let shotSprite = null, shotSpriteR = 0, shotSpriteCx = 0, shotSpriteCy = 0;
+  let shotSpriteW = 0, shotSpriteH = 0;
+  function buildShotSprite(r){
+    const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    const tail = r * 4.2;
+    const w = r * 2.8, h = r * 1.4 + tail;
+    const cx = w / 2, cy = r * 1.4;
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(w * dpr); c.height = Math.ceil(h * dpr);
+    const g2 = c.getContext('2d');
+    g2.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const tg = g2.createLinearGradient(cx, cy, cx, cy + tail);
+    tg.addColorStop(0, 'rgba(255,143,214,.45)');
+    tg.addColorStop(1, 'rgba(255,143,214,0)');
+    g2.fillStyle = tg;
+    g2.beginPath();
+    g2.moveTo(cx - r * 0.52, cy);
+    g2.lineTo(cx + r * 0.52, cy);
+    g2.lineTo(cx, cy + tail);
+    g2.closePath();
+    g2.fill();
+
+    const rg = g2.createRadialGradient(cx - r * 0.3, cy - r * 0.35, r * 0.08, cx, cy, r);
+    rg.addColorStop(0, 'rgba(255,255,255,.98)');
+    rg.addColorStop(0.55, 'rgba(255,182,232,.84)');
+    rg.addColorStop(1, 'rgba(255,79,195,.40)');
+    g2.fillStyle = rg;
+    g2.beginPath(); g2.arc(cx, cy, r, 0, 6.2832); g2.fill();
+    g2.lineWidth = 2.4; g2.strokeStyle = 'rgba(255,255,255,.95)'; g2.stroke();
+    g2.beginPath(); g2.arc(cx - r * 0.34, cy - r * 0.38, r * 0.25, 0, 6.2832);
+    g2.fillStyle = 'rgba(255,255,255,.95)'; g2.fill();
+
+    shotSprite = c; shotSpriteR = r; shotSpriteCx = cx; shotSpriteCy = cy;
+    shotSpriteW = w; shotSpriteH = h;
+  }
   function drawShots(){
+    if(!shots.length) return;
+    const base = shots[0].r;
+    if(!shotSprite || Math.abs(base - shotSpriteR) > 0.5) buildShotSprite(base);
     for(let i = 0; i < shots.length; i++){
       const b = shots[i];
-      const r = b.r * (1 + Math.sin(b.age * 24) * 0.08);
-      ctx.save();
-      // a soft tail, so a bubble reads as travelling rather than hovering
-      const tail = ctx.createLinearGradient(b.x, b.y, b.x, b.y + r * 4.2);
-      tail.addColorStop(0, 'rgba(255,143,214,.45)');
-      tail.addColorStop(1, 'rgba(255,143,214,0)');
-      ctx.fillStyle = tail;
-      ctx.beginPath();
-      ctx.moveTo(b.x - r * 0.52, b.y);
-      ctx.lineTo(b.x + r * 0.52, b.y);
-      ctx.lineTo(b.x, b.y + r * 4.2);
-      ctx.closePath();
-      ctx.fill();
-      const g = ctx.createRadialGradient(b.x - r * 0.3, b.y - r * 0.35, r * 0.08, b.x, b.y, r);
-      g.addColorStop(0, 'rgba(255,255,255,.98)');
-      g.addColorStop(0.55, 'rgba(255,182,232,.84)');
-      g.addColorStop(1, 'rgba(255,79,195,.40)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 6.2832); ctx.fill();
-      ctx.lineWidth = 2.4;
-      ctx.strokeStyle = 'rgba(255,255,255,.95)';
-      ctx.stroke();
-      ctx.beginPath(); ctx.arc(b.x - r * 0.34, b.y - r * 0.38, r * 0.25, 0, 6.2832);
-      ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.fill();
-      ctx.restore();
+      // the pulse is a scale on the stamp rather than a redraw
+      const k = (b.r / shotSpriteR) * (1 + Math.sin(b.age * 24) * 0.08);
+      const w = shotSpriteW * k, h = shotSpriteH * k;
+      ctx.drawImage(shotSprite, b.x - shotSpriteCx * k, b.y - shotSpriteCy * k, w, h);
     }
   }
 
@@ -1829,7 +2264,16 @@
     if(!running) return;
     let dt = (now - lastT) / 1000;
     lastT = now;
-    if(dt > 0.05) dt = 0.05;
+    /* clamped at a 30fps step. Anything longer is a stall (a tab coming back,
+       a garbage collection) and letting it through would teleport everything
+       falling straight through the buddy. */
+    if(dt > 0.0334) dt = 0.0334;
+    // shake and the hit-stop timer run on real time, not on game time
+    const realDt = dt;
+    if(hitStop > 0){
+      hitStop = Math.max(0, hitStop - realDt);
+      dt *= 0.14;
+    }
     elapsed += dt;
 
     // timer: counts down in a round, counts up in endless
@@ -1842,7 +2286,7 @@
       const cur = Math.max(0, Math.ceil(timeLeft));
       if(cur !== prev){
         timeVal.textContent = cur;
-        if(cur <= 10){ timePill.classList.add('low'); if(cur > 0) sfx.tick(); }
+        if(cur <= 10){ timePill.classList.add('low'); if(cur > 0) (cur <= 3 ? sfx.tickHot() : sfx.tick()); }
       }
       if(timeLeft <= 0){ finish(); return; }
     }
@@ -1852,10 +2296,20 @@
     const snap = perk.snap || 1;
     if(keyDir) targetX += keyDir * 620 * spd * dt;
     targetX = Math.max(40, Math.min(W - 40, targetX));
-    // snap is the one that you actually feel with a finger or a mouse:
-    // it is how tightly the buddy tracks where you are pointing
-    px += (targetX - px) * Math.min(1, dt * 13 * snap);
+    /* snap is the one that you actually feel with a finger or a mouse: it is
+       how tightly the buddy tracks where you are pointing. Written as a decay
+       rather than "move a fraction of the gap each frame", so she arrives at
+       the same speed on a 60Hz laptop and a 120Hz phone instead of tracking
+       noticeably tighter on the faster screen. */
+    const prevPx = px;
+    px += (targetX - px) * (1 - Math.exp(-13 * snap * realDt));
+    // a smoothed velocity drives the lean, so the tilt settles rather than snaps
+    const instVel = (px - prevPx) / Math.max(realDt, 0.001);
+    leanVel += (instVel - leanVel) * Math.min(1, realDt * 11);
+    bobT += realDt;
     placePlayer();
+    stepShake(realDt);
+    stepWarns(dt);
 
     // motion trail
     if(!reduceMotion){
@@ -1964,7 +2418,7 @@
         const gap = (f.x + wob) - pcx;
         const ax = Math.abs(gap);
         if(ax > ps * 0.30 && ax < ps * 1.40){
-          if(!f.veered){ f.veered = 1; earT = EAR_REST; sfx.whoosh(); }
+          if(!f.veered){ f.veered = 1; earT = EAR_REST; sfx.whoosh(f.x); }
           f.x += Math.sign(gap) * 120 * dt;
         }
       } else if(perk.pull && f.kind === 'friend'){
@@ -1984,9 +2438,9 @@
         if(ddx*ddx + ddy*ddy < nr*nr && ddx*ddx + ddy*ddy >= rr*rr && f.y > pcy - ps){
           f.near = true;
           score += (perk.nearBonus || 1);
-          scoreVal.textContent = score;
+          setScore();
           floatText('close! +' + (perk.nearBonus || 1), f.x + wob, f.y, 'close');
-          sfx.whoosh();
+          sfx.whoosh(f.x + wob);
         }
       }
 
@@ -2021,7 +2475,11 @@
         // a friend slipping past no longer breaks the streak, because with several
         // falling at once that made the multiplier unreachable. The streak now
         // lives on the catch timer and breaks only when you take damage.
-        if(f.kind === 'friend' && combo > 0) comboT = Math.min(comboT, 1.6);
+        if(f.kind === 'friend'){
+          // a quiet note so a drop you did not see still registers as a loss
+          if(f.y < H + f.size * 2) sfx.miss(f.x + wob);
+          if(combo > 0) comboT = Math.min(comboT, 1.6);
+        }
         f.el.remove();
         fallers.splice(i,1);
       }
@@ -2035,23 +2493,46 @@
 
   function stepParticles(dt){
     ctx.clearRect(0,0,W,H);
+    // air drag, so a burst flares out and settles instead of flying flat away
+    const drag = Math.pow(0.12, dt);
+    let sparks = 0;
     for(let i = particles.length - 1; i >= 0; i--){
       const p = particles[i];
       p.age += dt;
       if(p.age >= p.life){ particles.splice(i,1); continue; }
       p.vy += (p.g === undefined ? 900 : p.g) * dt;
+      if(p.shape !== 'confetti'){ p.vx *= drag; p.vy *= (0.5 + drag * 0.5); }
       p.x += p.vx * dt; p.y += p.vy * dt;
-      const k = 1 - p.age / p.life;
+      const k = Math.max(0, 1 - p.age / p.life);
       ctx.save();
-      ctx.globalAlpha = Math.max(0, k) * (p.a === undefined ? 1 : p.a);
+      ctx.globalAlpha = k * (p.a === undefined ? 1 : p.a);
       ctx.translate(p.x, p.y);
-      ctx.rotate(p.spin + p.age * 7);
-      ctx.fillStyle = p.c;
-      ctx.beginPath();
-      ctx.roundRect(-p.r, -p.r*0.7, p.r*2, p.r*1.4, p.r*0.5);
-      ctx.fill();
+      if(p.shape === 'spark'){
+        // additive, so overlapping twinkles bloom rather than muddy
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.rotate(p.spin + p.age * 3.4);
+        const r = p.r * (0.35 + k * 0.95);
+        ctx.fillStyle = p.c;
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 2.1);
+        ctx.quadraticCurveTo(r * 0.24, -r * 0.24, r * 2.1, 0);
+        ctx.quadraticCurveTo(r * 0.24, r * 0.24, 0, r * 2.1);
+        ctx.quadraticCurveTo(-r * 0.24, r * 0.24, -r * 2.1, 0);
+        ctx.quadraticCurveTo(-r * 0.24, -r * 0.24, 0, -r * 2.1);
+        ctx.fill();
+        sparks++;
+      } else {
+        ctx.rotate(p.spin + p.age * 7);
+        ctx.fillStyle = p.c;
+        ctx.beginPath();
+        // chips flatten as they tumble, which reads as paper rather than pills
+        const sq = 0.35 + 0.65 * Math.abs(Math.cos(p.spin + p.age * 9));
+        ctx.roundRect(-p.r, -p.r * 0.7 * sq, p.r * 2, p.r * 1.4 * sq, p.r * 0.45 * sq);
+        ctx.fill();
+      }
       ctx.restore();
     }
+    if(sparks) ctx.globalCompositeOperation = 'source-over';
   }
 
   function confetti(){
@@ -2061,7 +2542,8 @@
         x: Math.random() * W, y: -20 - Math.random() * H * 0.5,
         vx: (Math.random()*2-1) * 90, vy: 60 + Math.random() * 160,
         r: 4 + Math.random() * 6, life: 2.4 + Math.random() * 1.6, age: 0,
-        c: colors[(Math.random()*colors.length)|0], spin: Math.random()*6
+        c: colors[(Math.random()*colors.length)|0], spin: Math.random()*6,
+        shape: 'confetti'
       });
     }
     let t = performance.now();
@@ -2090,11 +2572,13 @@
     resetSky();
     hud.classList.add('hidden');
     comboPill.classList.remove('on');
-    pwRow.innerHTML = '';
+    clearPowerUps();
+    clearWarns();
     pw.magnet = 0; pw.slow = 0; pw.x2 = 0; pw.blaster = 0;
     paused = false;
     pauseEl.classList.add('hidden');
-    world.classList.remove('shake');
+    trauma = 0; hitStop = 0;
+    world.style.transform = '';
     if(hearts === 0) buzz(HAPTIC.gameOver);
     stormEl.style.opacity = 0;
     waveEl.classList.remove('go');
@@ -2223,6 +2707,7 @@
     };
   }
 
+  buildPwChips();
   makeFlowers();
   makeStars();
   resize();
