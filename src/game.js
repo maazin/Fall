@@ -143,6 +143,7 @@
   const screenOver = document.getElementById('screenOver');
   const screenBoard = document.getElementById('screenBoard');
   const screenSquad = document.getElementById('screenSquad');
+  const screenHelp = document.getElementById('screenHelp');
   const buddyGrid = document.getElementById('buddyGrid');
   const stormEl = document.getElementById('storm');
   const flashEl = document.getElementById('flash');
@@ -165,10 +166,24 @@
   function roundLen(){ return ROUND + (perk.extraTime || 0); }
 
   /* ---------------- modes and difficulty ---------------- */
+  /* heartPay is what one heart carried to the end of a full round is worth.
+     It used to be a flat 12 everywhere, which meant Chill handed out 5x12=60
+     free points against Storm's 2x12=24. Even with Storm's +36% brave bonus,
+     Chill paid more than Storm on any round scoring under 100 in catches, so
+     the safest difficulty was also the best-scoring one and "brutal" was a
+     trap. Per-heart pay now runs the other way, which keeps the survival pot
+     roughly level (35 / 36 / 40) and lets the brave bonus actually decide it:
+
+       base    Chill (base+35)   Normal (1.18x+36)   Storm (1.36x+40)
+         50          85                 95                 108
+        100         135                154                 176
+
+     Turtling for 60 seconds is now worth 35-40 rather than 60, and Storm
+     wins at every score instead of none. */
   const DIFFS = {
-    chill:  { hearts:5, pace:0.70, boltAt:34, label:'Chill'  },
-    normal: { hearts:3, pace:1.00, boltAt:22, label:'Normal' },
-    storm:  { hearts:2, pace:1.34, boltAt:16, label:'Storm'  }
+    chill:  { hearts:5, pace:0.70, boltAt:34, heartPay:7,  label:'Chill'  },
+    normal: { hearts:3, pace:1.00, boltAt:22, heartPay:12, label:'Normal' },
+    storm:  { hearts:2, pace:1.34, boltAt:16, heartPay:20, label:'Storm'  }
   };
   let mode = 'round';
   let diffKey = 'normal';
@@ -949,15 +964,33 @@
     buddyGrid.appendChild(b);
   });
 
+  const perkBox = document.getElementById('perkBox');
+  const perkMore = document.getElementById('perkMore');
   function showPerk(i){
     const c = CHARS[i], pk = PERKS[c.name] || NO_PERK;
     document.getElementById('perkImg').src = c.src;
     document.getElementById('perkWho').textContent = c.name + ':';
     document.getElementById('perkTitle').textContent = pk.t;
     document.getElementById('perkLong').textContent = pk.long || pk.d;
+    // a fresh buddy always starts collapsed, so the panel keeps its height
+    perkBox.classList.remove('open');
+    if(perkMore) perkMore.textContent = 'more';
   }
+  /* Clamped to three lines because it is a sticky header now and Herbie's
+     write-up is a paragraph. Tap it for the rest. */
+  perkBox.addEventListener('click', function(){
+    const open = perkBox.classList.toggle('open');
+    if(perkMore) perkMore.textContent = open ? 'less' : 'more';
+    sfx.tap();
+  });
 
-  function show(el){ [screenTitle, screenPick, screenOver, screenBoard, screenSquad].forEach(function(s){ s.classList.add('hidden'); }); if(el) el.classList.remove('hidden'); }
+  function show(el){
+    [screenTitle, screenPick, screenOver, screenBoard, screenSquad, screenHelp]
+      .forEach(function(s){ s.classList.add('hidden'); });
+    if(el) el.classList.remove('hidden');
+  }
+  document.getElementById('helpBtn').addEventListener('click', function(){ sfx.tap(); show(screenHelp); });
+  document.getElementById('helpBackBtn').addEventListener('click', function(){ sfx.tap(); show(screenTitle); });
 
   document.getElementById('toPickBtn').addEventListener('click', function(){ audio(); sfx.tap(); showPerk(picked); show(screenPick); });
   document.getElementById('startBtn').addEventListener('click', function(){ sfx.tap(); begin(); });
@@ -1330,6 +1363,7 @@
     comboBarFill.style.transform = 'scaleX(1)';
     clearPowerUps();
     clearWarns();
+    clearTips();
     trauma = 0; hitStop = 0; leanVel = 0; bobT = 0;
     world.style.transform = '';
     bossState = 'none'; bossT = 0; bossShots = 0; bossHurt = false;
@@ -1613,6 +1647,12 @@
     else if(r < starC + boltC + rainC + pwC) kind = pickPowerUp();
     else if(r < starC + boltC + rainC + pwC + mimicC) kind = 'mimic';
 
+    if(kind === 'star') tipOnce('star');
+    else if(kind === 'rain') tipOnce('rain');
+    else if(kind === 'bolt') tipOnce('bolt');
+    else if(kind === 'purse') tipOnce('purse');
+    else if(isGift(kind)) tipOnce('gift');
+
     const atX = s/2 + Math.random() * Math.max(1, W - s);
     if(kind === 'bolt') telegraphBolt(atX, s); else spawnAt(kind, atX, s);
 
@@ -1838,6 +1878,42 @@
     bossEl.style.transform = 'translate(' + (bossX - bs/2) + 'px,' + targetY + 'px)';
   }
 
+  /* ---------------- first-time tips ----------------
+     The title screen used to explain eight rules before it let you play, which
+     on a phone put the Play button below the fold and made a squishmallow game
+     feel like homework. The rules now teach themselves the first time each
+     thing actually falls, once per device, and live on the How to play screen
+     for anyone who wants the list. */
+  const tipEl = document.getElementById('tip');
+  let seenTips = loadJSON('squishTips', {});
+  let tipQueue = [], tipT = 0;
+  const TIPS = {
+    star:    ['\u2B50', 'Stars are worth 5!'],
+    rain:    ['\uD83C\uDF27\uFE0F', 'Grumpy rain costs a heart'],
+    bolt:    ['\u26A1', 'Lightning is fast \u2014 move!'],
+    gift:    ['\uD83E\uDEE7', 'Bubbles are good. Grab them!'],
+    purse:   ['\uD83D\uDC5B', 'The purse clears the screen!'],
+    combo:   ['\uD83D\uDD25', 'Keep catching for a multiplier'],
+    blaster: ['\uD83E\uDEE7', 'You shoot on your own now'],
+    web:     ['\uD83D\uDD78\uFE0F', 'Missed friends wait in the web']
+  };
+  function tipOnce(key){
+    // reduced motion still gets the lesson, just without the banner moving
+    if(!TIPS[key] || seenTips[key]) return;
+    seenTips[key] = 1;
+    saveJSON('squishTips', seenTips);
+    tipQueue.push(key);
+  }
+  function stepTips(dt){
+    if(tipT > 0){ tipT -= dt; return; }
+    if(!tipQueue.length) return;
+    const t = TIPS[tipQueue.shift()];
+    tipEl.innerHTML = '<span class="ico">' + t[0] + '</span>' + t[1];
+    tipEl.classList.remove('go'); void tipEl.offsetWidth; tipEl.classList.add('go');
+    tipT = 2.9;                 // the banner runs 2.6s; a beat of air after it
+  }
+  function clearTips(){ tipQueue = []; tipT = 0; tipEl.classList.remove('go'); }
+
   function floatText(text, x, y, cls){
     const d = document.createElement('div');
     d.className = 'float' + (cls ? ' ' + cls : '');
@@ -1992,6 +2068,7 @@
                     : f.kind === 'slow'    ? (perk.slowBoost   || 1)
                     : f.kind === 'blaster' ? (perk.blastBoost  || 1) : 1;
         pw[f.kind] = PW[f.kind].dur * boost;
+        if(f.kind === 'blaster') tipOnce('blaster');
         floatText(PW[f.kind].t + '!', cx, cy, 'star');
         burst(cx, cy, [PW[f.kind].col,'#FFF'], 22);
       }
@@ -2070,7 +2147,7 @@
     if(combo > bestCombo) bestCombo = combo;
     comboT = comboWindow();
     const tier = multiplier();
-    if(tier > wasM){ sfx.comboUp(tier); buzz(HAPTIC.comboUp); freeze(0.05); }
+    if(tier > wasM){ sfx.comboUp(tier); buzz(HAPTIC.comboUp); freeze(0.05); tipOnce('combo'); }
     const m = tier * (pwActive('x2') ? 2 : 1);
 
     if(f.kind === 'star'){
@@ -2310,6 +2387,7 @@
     placePlayer();
     stepShake(realDt);
     stepWarns(dt);
+    stepTips(realDt);
 
     // motion trail
     if(!reduceMotion){
@@ -2458,6 +2536,7 @@
       // Sticky Web: a friend that reaches the ground waits in a web for a moment
       if(perk.webTime && f.kind === 'friend' && !f.webbed && f.y > groundY - f.size * 0.1){
         f.webbed = perk.webTime;
+        tipOnce('web');
         f.vy = 0; f.sway = 0;
         f.y = groundY - f.size * 0.28;
         f.el.classList.add('webbed');
@@ -2574,6 +2653,7 @@
     comboPill.classList.remove('on');
     clearPowerUps();
     clearWarns();
+    clearTips();
     pw.magnet = 0; pw.slow = 0; pw.x2 = 0; pw.blaster = 0;
     paused = false;
     pauseEl.classList.add('hidden');
@@ -2590,7 +2670,8 @@
     const base = score;
     // only pay for hearts you carried to the end of a real round, otherwise
     // quitting on turn one would be the best-paying move in the game
-    const heartBonus = fullRound ? hearts * 12 : 0;
+    const heartPay = diff().heartPay || 12;
+    const heartBonus = fullRound ? hearts * heartPay : 0;
     // hoarding shields is Mel's whole identity, so it should pay
     const shieldBonus = (fullRound && perk.shieldMax > 1) ? shield * 12 : 0;
     // fewer starting hearts means a braver run, so it pays more
@@ -2612,7 +2693,7 @@
     if(purseUses) caughtSub.push(purseUses + ' purse' + (purseUses === 1 ? '' : 's') + ' popped');
     if(cloudsPopped) caughtSub.push(cloudsPopped + ' cloud' + (cloudsPopped === 1 ? '' : 's') + ' blasted');
     tallyRow('Caught', caughtSub.join(', '), base);
-    if(heartBonus) tallyRow('Hearts saved', hearts + ' left at 12 each', '+' + heartBonus, 'bonus');
+    if(heartBonus) tallyRow('Hearts saved', hearts + ' left at ' + heartPay + ' each', '+' + heartBonus, 'bonus');
     if(shieldBonus) tallyRow('Shields kept', shield + ' unspent at 12 each', '+' + shieldBonus, 'bonus');
     if(braveBonus) tallyRow('Brave start', 'on ' + diff().label + ', +' + Math.round(braveRate * 100) + '%', '+' + braveBonus, 'bonus');
 

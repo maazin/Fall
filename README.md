@@ -9,6 +9,7 @@ small Vercel serverless functions for the shared scoreboard.
 ```
 index.html              page markup only; loads the stylesheet and script below
 manifest.webmanifest    PWA manifest (home-screen install)
+sw.js                   service worker; caches the game so it plays offline
 src/
   styles.css            all styles
   game.js               the whole game: roster, perks, modes, audio, boards, loop
@@ -41,6 +42,21 @@ the global board — the page just shows the local best-runs list.
   its own does nothing.
 - **Keyboard:** ← → or A / D. `P` or `Esc` pauses.
 
+The rules live on the **How to play** screen, and the first time each hazard or
+bubble actually falls the game says what it does, once per device. Clearing
+`squishTips` in localStorage makes it introduce itself again.
+
+## Offline
+
+`sw.js` precaches the page, the stylesheet, the script and all nineteen buddies,
+so the game is playable with no signal once it has been opened once. The
+scoreboard routes (`/api/*`) are never cached.
+
+**Bump `VERSION` in `sw.js` on every deploy.** Precached files are keyed by it,
+so a new version re-fetches everything and drops the old cache; without a bump a
+returning player keeps the previous CSS and JS until a background refresh
+catches up on their next visit.
+
 ## Adding a buddy
 
 1. Drop a `.webp` into `assets/buddies/`.
@@ -56,3 +72,20 @@ Push to GitHub with the repo connected to Vercel. Environment variables:
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Redis REST credentials for the scoreboard (the Upstash / `REDIS_REST_*` names are accepted too). Without them the board is disabled. |
 | `BOARD_SEASON` | Optional. Bump to start a fresh, empty board without deleting the old one; set it back to restore. |
 | `ADMIN_TOKEN` | Optional. Enables `POST /api/reset` with an `x-admin-token` header. Unset means the route refuses everything. |
+
+## Scoring
+
+Catches are worth the multiplier; the rest of the score is paid at the end of a
+full round. Hearts you still hold pay `heartPay` each, which runs *against* the
+difficulty's heart count so that bravery is worth something:
+
+| | hearts | per heart | survival pot | brave bonus |
+| --- | --- | --- | --- | --- |
+| Chill | 5 | 7 | 35 | — |
+| Normal | 3 | 12 | 36 | +18% of catches |
+| Storm | 2 | 20 | 40 | +36% of catches |
+
+A flat rate paid Chill 60 against Storm's 24, which made the gentlest setting
+the highest-scoring one at any realistic score. Note the shared board still
+mixes all four mode/difficulty combinations into one ranking, and Endless never
+earns the survival pot at all — separate boards are the fix, not done yet.

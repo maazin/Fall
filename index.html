@@ -34,6 +34,14 @@ if(/^https?:$/.test(location.protocol)){
   vaScript.src = '/_vercel/insights/script.js';
   document.head.appendChild(vaScript);
 }
+
+/* Offline play. Same http(s) guard: there is no service worker off a file://
+   page, and registering one there throws. See sw.js for the caching rules. */
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@700;900&display=swap">
 <link rel="stylesheet" href="src/styles.css">
@@ -75,6 +83,7 @@ if(/^https?:$/.test(location.protocol)){
 
   <div id="blast" aria-hidden="true"></div>
   <div id="wave" aria-hidden="true"></div>
+  <div id="tip" aria-hidden="true"></div>
 
   <div id="pause" class="hidden">
     <div class="box">
@@ -92,7 +101,38 @@ if(/^https?:$/.test(location.protocol)){
     <div class="card">
       <p class="eyebrow">A very squishy game</p>
       <h1>Squish Squad Catch</h1>
-      <p class="lede">The squad is falling out of the sky. Slide left and right to catch them. It starts gentle, then a storm rolls in. Chain catches for a multiplier, grab the bubbles, and pick your buddy carefully.</p>
+      <p class="lede">Slide left and right to catch the squad falling out of the sky.</p>
+
+      <p class="seg-label">Mode</p>
+      <div class="seg" id="modeSeg">
+        <button type="button" data-mode="round" class="sel">60 seconds<small>Beat the clock</small></button>
+        <button type="button" data-mode="endless">Endless<small>Until your hearts go</small></button>
+      </div>
+
+      <p class="seg-label">Difficulty</p>
+      <div class="seg" id="diffSeg">
+        <button type="button" data-diff="chill">Chill<small>5 hearts, gentle</small></button>
+        <button type="button" data-diff="normal" class="sel">Normal<small>3 hearts</small></button>
+        <button type="button" data-diff="storm">Storm<small>2 hearts, top pay</small></button>
+      </div>
+
+      <button class="btn" id="toPickBtn">Pick my buddy!</button>
+      <div class="btn-row">
+        <button class="btn ghost" id="helpBtn">How to play</button>
+        <button class="btn ghost" id="boardBtn">Scores</button>
+        <button class="btn ghost" id="squadBtn">Squad book</button>
+      </div>
+      <label class="opt"><input type="checkbox" id="flashOpt"> Turn off lightning flashes</label>
+    </div>
+  </section>
+
+  <!-- HOW TO PLAY: the rules strip used to sit on the title screen and pushed
+       the Play button off the bottom of every phone. -->
+  <section class="screen hidden" id="screenHelp">
+    <div class="card">
+      <p class="eyebrow">The basics</p>
+      <h2>How to play</h2>
+      <p class="lede">Your buddy follows your finger or your mouse. It starts gentle, then a storm rolls in. Chain catches for a multiplier and pick your buddy carefully &mdash; each one plays differently.</p>
 
       <div class="rules">
         <div class="rule"><span class="chip" id="ruleFriend"></span><span>Catch a friend<small>+1 point</small></span></div>
@@ -105,43 +145,30 @@ if(/^https?:$/.test(location.protocol)){
         <div class="rule"><span class="chip">🔥</span><span>Chain catches<small>up to x4 points</small></span></div>
       </div>
 
-      <p class="seg-label">Mode</p>
-      <div class="seg" id="modeSeg">
-        <button type="button" data-mode="round" class="sel">60 seconds<small>Beat the clock</small></button>
-        <button type="button" data-mode="endless">Endless<small>Until your hearts go</small></button>
-      </div>
+      <p class="seg-label">Keys</p>
+      <p class="lede">← → or A / D to move. P or Esc to pause.</p>
 
-      <p class="seg-label">Difficulty</p>
-      <div class="seg" id="diffSeg">
-        <button type="button" data-diff="chill">Chill<small>5 hearts, gentle</small></button>
-        <button type="button" data-diff="normal" class="sel">Normal<small>3 hearts</small></button>
-        <button type="button" data-diff="storm">Storm<small>2 hearts, brutal</small></button>
-      </div>
-
-      <button class="btn" id="toPickBtn">Pick my buddy!</button>
-      <div class="btn-row">
-        <button class="btn ghost" id="boardBtn">Scores</button>
-        <button class="btn ghost" id="squadBtn">Squad book</button>
-      </div>
-      <label class="opt"><input type="checkbox" id="flashOpt"> Turn off lightning flashes</label>
+      <div class="btn-row"><button class="btn" id="helpBackBtn">Got it!</button></div>
     </div>
   </section>
 
-  <!-- PICKER -->
+  <!-- PICKER: the perk panel is above the grid and sticks to the top, so the
+       buddy you just tapped explains itself while you keep scrolling, and the
+       Play button is pinned to the bottom instead of below eighteen tiles. -->
   <section class="screen hidden" id="screenPick">
     <div class="card">
       <p class="eyebrow">Step 1 of 1</p>
       <h2>Who's catching today?</h2>
-      Tap the squishmallow you want to play as. Each one plays a little differently.
-      <div class="buddies" id="buddyGrid"></div>
       <div class="perkbox" id="perkBox">
         <img id="perkImg" alt="">
         <div>
           <p class="pname"><span id="perkWho"></span> <b id="perkTitle"></b></p>
           <p class="pdesc" id="perkLong"></p>
+          <span class="pmore" id="perkMore">more</span>
         </div>
       </div>
-      <div class="btn-row"><button class="btn" id="startBtn">Let's play!</button></div>
+      <div class="buddies" id="buddyGrid"></div>
+      <div class="pickbar"><button class="btn" id="startBtn">Let's play!</button></div>
     </div>
   </section>
 

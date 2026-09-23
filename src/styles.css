@@ -188,8 +188,14 @@ body{
     padding:calc(10px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) 10px calc(10px + env(safe-area-inset-left));
   }
   #hud::after{content:"";flex-basis:100%;order:8;height:0}
-  #comboPill{order:9}
-  #pwRow{order:10}
+  /* At 375px the top row could not hold score, time, hearts and both
+     buttons, so the mute button wrapped on its own and sat stranded under
+     the score. Hearts drop to the second row with the combo pill instead,
+     which leaves the top row as two readouts and two controls at any width. */
+  #pauseBtn{margin-left:auto}
+  #hearts{order:9;margin-left:0}
+  #comboPill{order:10}
+  #pwRow{order:11}
   .pill{padding:5px 12px;border-width:3px;font-size:19px;gap:6px;box-shadow:0 4px 0 var(--shadow)}
   .pill .cap{font-size:9.5px;letter-spacing:.1em}
   .heart{width:21px;height:21px}
@@ -316,6 +322,28 @@ body.noflash #flash{display:none}
   text-shadow:0 4px 0 var(--bubblegum-dk),0 0 18px rgba(255,255,255,.65);
 }
 #wave.go{animation:waveIn 1.9s ease-out}
+
+/* First-time hints, shown once per device. Smaller than #wave and parked
+   lower, so a tip and a wave call-out never land on top of each other. */
+#tip{
+  position:absolute;left:50%;top:44%;z-index:35;pointer-events:none;
+  transform:translate(-50%,0);
+  display:flex;align-items:center;gap:9px;
+  background:var(--cream);border:4px solid #fff;border-radius:999px;
+  padding:8px 18px;box-shadow:0 5px 0 var(--shadow);
+  font-family:"Baloo 2",sans-serif;font-weight:800;
+  font-size:clamp(14px,3.4vw,19px);color:var(--plum);
+  white-space:nowrap;max-width:92vw;opacity:0;
+}
+#tip .ico{font-size:1.25em;line-height:1}
+#tip.go{animation:tipIn 2.6s cubic-bezier(.2,1.3,.4,1)}
+@keyframes tipIn{
+  0%{opacity:0;transform:translate(-50%,14px) scale(.8)}
+  9%{opacity:1;transform:translate(-50%,0) scale(1.04)}
+  15%{transform:translate(-50%,0) scale(1)}
+  84%{opacity:1;transform:translate(-50%,0) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-18px) scale(.96)}
+}
 /* --- juice: screen shake ---
    Driven from the game loop as a decaying trauma value rather than one fixed
    keyframe, so a rain cloud nudges the screen and the purse rocks it, and two
@@ -579,6 +607,50 @@ h2{
   background:#fff;border-radius:22px;padding:12px 18px 12px 12px;margin-top:16px;
   box-shadow:0 5px 0 rgba(75,42,85,.10);
 }
+/* On the picker this sits above the grid and sticks to the top of the scroll,
+   so the buddy you just tapped keeps explaining itself while you carry on
+   scrolling. It used to live under eighteen tiles, off the bottom of every
+   phone, which made the whole panel pointless on the device most people use. */
+#screenPick .perkbox{
+  position:sticky;top:0;z-index:3;
+  align-items:flex-start;cursor:pointer;
+  margin-top:12px;
+}
+#screenPick .perkbox::after{      /* a fade so tiles do not cut off sharply under it */
+  content:"";position:absolute;left:0;right:0;top:100%;height:16px;
+  background:linear-gradient(180deg,var(--cream),rgba(255,248,252,0));
+  pointer-events:none;
+}
+#screenPick .perkbox img{margin-top:2px}
+/* Herbie's write-up is a paragraph; unclamped it would be a 250px header.
+   Tap the panel for the rest. */
+#screenPick .pdesc{
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;
+  overflow:hidden;
+}
+#screenPick .perkbox.open .pdesc{-webkit-line-clamp:99;overflow:visible}
+.pmore{
+  display:none;margin-top:3px;
+  font-family:"Nunito",sans-serif;font-weight:900;font-size:10.5px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--bubblegum);
+}
+#screenPick .pmore{display:inline-block}
+
+/* The primary action rides the bottom of the screen instead of sitting under
+   the whole grid. Sticky is bounded by the card, so it settles into place at
+   the end rather than floating over the last row for ever. */
+.pickbar{
+  position:sticky;bottom:0;z-index:3;
+  margin-top:14px;
+  padding:6px 0 calc(4px + env(safe-area-inset-bottom));
+  background:var(--cream);
+}
+.pickbar::before{
+  content:"";position:absolute;left:0;right:0;bottom:100%;height:26px;
+  background:linear-gradient(180deg,rgba(255,248,252,0),var(--cream));
+  pointer-events:none;
+}
+.pickbar .btn{margin-top:0}
 .perkbox img{width:62px;height:62px;object-fit:contain;flex:none}
 .perkbox .pname{
   margin:0 0 3px;font-family:"Baloo 2",sans-serif;font-weight:800;
@@ -759,7 +831,8 @@ h2{
   h2{font-size:clamp(22px,6.5vw,30px)}
   .lede{font-size:13.5px;line-height:1.42;margin-top:8px}
   .btn{font-size:20px;padding:12px 28px;margin-top:16px}
-  .btn.ghost{font-size:15px;padding:12px 18px}
+  /* three ghost buttons on the title screen need to share one row at 375px */
+  .btn.ghost{font-size:14.5px;padding:12px 13px}
   .btn-row{gap:9px}
   .rules{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:14px}
   .rule{text-align:left}
@@ -771,7 +844,9 @@ h2{
   .seg button small{font-size:9.5px}
   .seg-label{margin-top:13px;font-size:9.5px}
   .perkbox{padding:9px 12px 9px 9px;gap:10px;border-radius:17px;margin-top:12px}
+  #screenPick .perkbox{margin-top:10px}
   .perkbox img{width:50px;height:50px}
+  #screenPick .perkbox img{width:44px;height:44px}
   .perkbox .pname{font-size:13.5px}
   .perkbox .pdesc{font-size:11.5px;line-height:1.38}
   .opt{margin-top:11px;font-size:12px}
@@ -832,6 +907,9 @@ h2{
 
 @media (prefers-reduced-motion:reduce){
   .warn{animation:none}
+  /* the tip still shows and still goes away; it just stops sliding */
+  #tip.go{animation:tipHold 2.6s linear}
+  @keyframes tipHold{0%,100%{opacity:0}6%,90%{opacity:1}}
   .cloud,.faller .art,#overBuddy,#timePill.low,#flash.zap,.ring,#shieldRing,
   .faller.mimic .art::before,.faller.purse::after,.pw.ending,
   #comboPill.beat,#scoreVal.bump,#boss.charging .bossArt{animation:none !important}
