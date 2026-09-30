@@ -1126,8 +1126,15 @@
           }
           return;
         }
-        if(res.j.improved) note(postNote, 'New personal best on the global board!', 'good');
-        else note(postNote, 'Global best for ' + playerName + ' is still ' + res.j.best + '.', '');
+        if(res.j.buddyImproved){
+          const up = res.j.improved
+            ? ' Squad average now ' + fmtScore(res.j.average) + '.'
+            : '';
+          note(postNote, 'New best with ' + CHARS[picked].name + '!' + up, 'good');
+        } else {
+          note(postNote, 'Your best with ' + CHARS[picked].name + ' is still ' +
+            res.j.buddyBest + '. Squad average ' + fmtScore(res.j.average) + '.', '');
+        }
       })
       .catch(function(){ note(postNote, 'Could not reach the global board.', 'bad'); });
   }
@@ -1194,28 +1201,57 @@
             '</li>';
           return;
         }
+        const avgBoard = !boardBuddy;
         rows.forEach(function(e, i){
-          const ci = CHARS.map(function(c){ return c.name; }).indexOf(e.buddy);
-          const c = ci > -1 ? CHARS[ci] : null;
+          // the overall board names the buddy they are strongest with; a
+          // per-buddy board is already about one character
+          const c = charBySlug(e.buddy);
           const li = document.createElement('li');
           li.className = (i === 0 ? 'top1 ' : '') + (e.name === playerName ? 'me' : '');
+          const sub = avgBoard
+            ? (e.buddies || 0) + ' of ' + (e.roster || 19) + ' buddies' +
+              (e.best ? ' \u00B7 best ' + e.best : '') +
+              (c ? ' with ' + escapeText(c.name) : '')
+            : (e.mode === 'endless' ? 'Endless' : '60s') + ' \u00B7 ' +
+              (DIFFS[e.diff] ? DIFFS[e.diff].label : 'Normal') +
+              (e.at ? ' \u00B7 ' + e.at : '');
           li.innerHTML =
             '<span class="rank">' + (i === 0 ? '\uD83C\uDFC6' : '#' + (i + 1)) + '</span>' +
             (c ? '<img src="' + c.src + '" alt="">' : '') +
-            '<span>' + escapeText(e.name) +
-            '<small>' + (e.buddy ? escapeText(e.buddy) + ' \u00B7 ' : '') +
-            (e.mode === 'endless' ? 'Endless' : '60s') + ' \u00B7 ' +
-            (DIFFS[e.diff] ? DIFFS[e.diff].label : 'Normal') +
-            (e.at ? ' \u00B7 ' + e.at : '') + '</small></span>' +
-            '<b>' + e.score + '</b>';
+            '<span>' + escapeText(e.name) + '<small>' + sub + '</small></span>' +
+            '<b>' + fmtScore(e.score) + '</b>';
           globalList.appendChild(li);
         });
-        note(globalNote, playerName ? 'Posting as ' + playerName : '');
+        note(globalNote, avgBoard
+          ? 'Ranked by your average across all ' + ((rows[0] && rows[0].roster) || 19) +
+            ' buddies. Ones you have never played count as zero.'
+          : 'Best run with this buddy.' + (playerName ? ' Posting as ' + playerName : ''));
       })
       .catch(function(){
         globalList.innerHTML = '<li class="empty">Board unavailable</li>';
         note(globalNote, 'Could not reach the board. Are you offline?', 'bad');
       });
+  }
+
+  /* The overall board names a buddy by slug, because that is what its keys are
+     named after; a per-buddy board echoes the name back exactly as it was asked
+     for. Accept either, and slug both sides so the comparison is symmetric. */
+  function slugOf(t){
+    return String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+  function charBySlug(who){
+    if(!who) return null;
+    for(let i = 0; i < CHARS.length; i++) if(CHARS[i].name === who) return CHARS[i];
+    const want = slugOf(who);
+    for(let i = 0; i < CHARS.length; i++) if(slugOf(CHARS[i].name) === want) return CHARS[i];
+    return null;
+  }
+  /* An average over nineteen characters lands on small numbers with meaningful
+     decimals, so they are worth showing; a plain best never has any. */
+  function fmtScore(n){
+    const v = Number(n);
+    if(!isFinite(v)) return '0';
+    return v % 1 === 0 ? String(v) : v.toFixed(1);
   }
 
   // names come back from a server other people write to, so never trust them as markup

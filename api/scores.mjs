@@ -1,9 +1,24 @@
 /* Shared scoreboard for Fall.
  *
  * Storage, all under the season prefix (see BOARD_SEASON below):
- *   <ns>best   sorted set, member = player name, score = their best ever
- *   <ns>meta   hash, player name -> JSON of how they got it
- *   <ns>b:<buddy>  one sorted set per character
+ *   <ns>b:<buddy>  one sorted set per character, member = player name,
+ *                  score = that player's best ever with that character
+ *   <ns>meta       hash, player name -> JSON of when they last posted
+ *
+ * The per-buddy sets are the only source of truth. The main board is not
+ * stored at all: it is the average of a player's best with each of the
+ * nineteen characters, divided by the whole roster rather than by however
+ * many they happen to have tried, so it answers "who is good with the whole
+ * squad" rather than "who had one lucky run".
+ *
+ *   average = (sum of their best with each buddy) / ROSTER.length
+ *
+ * Characters they have never played count as zero, which is the point: the
+ * only way up the board is to go and get good with somebody new.
+ *
+ * Deriving it on read rather than keeping a second sorted set in step means
+ * the board can never disagree with the per-buddy boards, and it needed no
+ * migration when it stopped being a max and started being a mean.
  *
  * One row per player, so the board answers "who is best" rather than filling
  * up with one person's twenty good runs.
@@ -29,15 +44,85 @@ const TOKEN =
 const SEASON = String(process.env.BOARD_SEASON || '1').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) || '1';
 const NS = SEASON === '1' ? 'fall:' : 'fall:s' + SEASON + ':';
 
-const ZKEY = NS + 'best';
+const ZKEY = NS + 'best';    // legacy: the old max-score board, no longer read
 const HKEY = NS + 'meta';
 const TOP = 20;
+
+/* The roster, and the divisor for every average on the main board.
+ *
+ * It has to live here rather than be counted from the keys that happen to
+ * exist, because a divisor that grows as new characters get posted would
+ * quietly restate everybody's score. It also has to live here rather than
+ * come from the client, because a client that could pick its own divisor
+ * could send 1 and top the board.
+ *
+ * KEEP IN STEP WITH `CHARS` IN src/game.js. A character missing from this
+ * list still gets its own per-buddy board, but contributes nothing to the
+ * main one. */
+const ROSTER = [
+  'mooni', 'omar', 'mamu', 'pineapple', 'blueberry-cow', 'bessie', 'mel',
+  'cheryl', 'ronnie', 'connor', 'lazy-harp-seal', 'me', 'devin',
+  'grandpa-herbie', 'sophie', 'carrie', 'butt-nugget', 'pip', 'pep'
+];
+
+function slugify(name) {
+  return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
 
 /* Per-buddy boards live in their own sorted sets, so picking a weaker buddy is a
    separate contest rather than a guaranteed loss on the overall board. */
 function buddyKey(name) {
-  const slug = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = slugify(name);
   return slug ? NS + 'b:' + slug : null;
+}
+
+/* Rebuilds the main board from the per-buddy sets. One pipeline: every
+   character's set, plus the meta hash for the dates. */
+async function overallRows() {
+  const cmds = ROSTER.map((slug) => ['ZRANGE', NS + 'b:' + slug, '0', '-1', 'WITHSCORES']);
+  cmds.push(['HGETALL', HKEY]);
+  const out = await redis(cmds);
+
+  const players = new Map();
+  ROSTER.forEach((slug, i) => {
+    const flat = (out[i] && out[i].result) || [];
+    for (let j = 0; j < flat.length; j += 2) {
+      const name = flat[j];
+      const val = Number(flat[j + 1]);
+      if (!Number.isFinite(val) || val <= 0) continue;
+      let p = players.get(name);
+      if (!p) { p = { name, sum: 0, buddies: 0, best: 0, bestBuddy: null }; players.set(name, p); }
+      p.sum += val;
+      p.buddies++;
+      if (val > p.best) { p.best = val; p.bestBuddy = slug; }
+    }
+  });
+
+  const metaFlat = (out[ROSTER.length] && out[ROSTER.length].result) || [];
+  const meta = {};
+  for (let i = 0; i < metaFlat.length; i += 2) {
+    try { meta[metaFlat[i]] = JSON.parse(metaFlat[i + 1]); } catch (e) { /* ignore */ }
+  }
+
+  return [...players.values()]
+    .map((p) => {
+      const m = meta[p.name] || {};
+      return {
+        name: p.name,
+        // two decimals of resolution: dividing by nineteen makes the
+        // differences between good players small
+        score: Math.round((p.sum / ROSTER.length) * 100) / 100,
+        buddies: p.buddies,
+        roster: ROSTER.length,
+        best: p.best,
+        buddy: p.bestBuddy,
+        mode: m.mode || null,
+        diff: m.diff || null,
+        at: m.at || null
+      };
+    })
+    .sort((a, b) => b.score - a.score || b.buddies - a.buddies)
+    .slice(0, TOP);
 }
 
 const MAX_SCORE = 5000;      // far above any real run, blocks silly numbers
@@ -104,32 +189,13 @@ export default async function handler(req, res) {
         return res.status(200).json({ season: SEASON, buddy: asked, rows: rows });
       }
 
-      const out = await redis([
-        ['ZRANGE', ZKEY, '0', String(TOP - 1), 'REV', 'WITHSCORES'],
-        ['HGETALL', HKEY]
-      ]);
-
-      const flat = (out[0] && out[0].result) || [];
-      const metaFlat = (out[1] && out[1].result) || [];
-      const meta = {};
-      for (let i = 0; i < metaFlat.length; i += 2) {
-        try { meta[metaFlat[i]] = JSON.parse(metaFlat[i + 1]); } catch (e) { /* ignore */ }
-      }
-
-      const rows = [];
-      for (let i = 0; i < flat.length; i += 2) {
-        const name = flat[i];
-        const m = meta[name] || {};
-        rows.push({
-          name: name,
-          score: Number(flat[i + 1]),
-          buddy: m.buddy || null,
-          mode: m.mode || null,
-          diff: m.diff || null,
-          at: m.at || null
-        });
-      }
-      return res.status(200).json({ season: SEASON, rows: rows });
+      const rows = await overallRows();
+      return res.status(200).json({
+        season: SEASON,
+        scoring: 'average',
+        roster: ROSTER.length,
+        rows: rows
+      });
     }
 
     if (req.method === 'POST') {
@@ -153,39 +219,53 @@ export default async function handler(req, res) {
       }
 
       const buddy = typeof body.buddy === 'string' ? body.buddy.slice(0, 24) : null;
-      const bk = buddy ? buddyKey(buddy) : null;
+      const slug = buddy ? slugify(buddy) : null;
+      const bk = slug ? NS + 'b:' + slug : null;
 
-      // read the overall best and the per-buddy best together
-      const prev = await redis(
-        bk ? [['ZSCORE', ZKEY, name], ['ZSCORE', bk, name]]
-           : [['ZSCORE', ZKEY, name]]
-      );
-      const num = (i) => {
+      /* Every one of their per-buddy bests, so the average can be reported
+         back without a second round trip after the write. */
+      const prev = await redis(ROSTER.map((s2) => ['ZSCORE', NS + 'b:' + s2, name]));
+      let sum = 0;
+      let buddyBest = -1;
+      ROSTER.forEach((s2, i) => {
         const raw = prev[i] && prev[i].result;
-        return (raw === null || raw === undefined) ? -1 : Number(raw);
-      };
-      const best = num(0);
-      const buddyBest = bk ? num(1) : -1;
+        const val = (raw === null || raw === undefined) ? 0 : Number(raw);
+        if (Number.isFinite(val) && val > 0) sum += val;
+        if (s2 === slug) buddyBest = (raw === null || raw === undefined) ? -1 : Number(raw);
+      });
+
+      const round2 = (n) => Math.round(n * 100) / 100;
+      const wasAvg = round2(sum / ROSTER.length);
+      const beatBuddy = !!bk && score > buddyBest;
+      // beating your own best with one character lifts the average by the
+      // difference, spread over the whole roster
+      const nowAvg = beatBuddy
+        ? round2((sum - Math.max(0, buddyBest) + score) / ROSTER.length)
+        : wasAvg;
 
       const writes = [];
-      if (score > best) {
-        writes.push(['ZADD', ZKEY, String(score), name]);
+      if (beatBuddy) writes.push(['ZADD', bk, String(score), name]);
+      {
+        // the date is "last seen", so it is written whether or not they improved
         writes.push(['HSET', HKEY, name, JSON.stringify({
-          buddy: buddy,
           mode: body.mode === 'endless' ? 'endless' : 'round',
           diff: ['chill', 'normal', 'storm'].indexOf(body.diff) > -1 ? body.diff : 'normal',
           at: new Date().toISOString().slice(0, 10)
         })]);
       }
-      if (bk && score > buddyBest) writes.push(['ZADD', bk, String(score), name]);
       if (writes.length) await redis(writes);
 
+      const known = ROSTER.indexOf(slug) > -1;
       return res.status(200).json({
         ok: true,
-        improved: score > best,
-        best: Math.max(best, score > best ? score : best),
-        buddyImproved: bk ? score > buddyBest : false,
-        buddyBest: bk ? Math.max(buddyBest, score) : null
+        scoring: 'average',
+        roster: ROSTER.length,
+        improved: beatBuddy && nowAvg > wasAvg,
+        average: nowAvg,
+        wasAverage: wasAvg,
+        buddyImproved: beatBuddy,
+        buddyBest: bk ? Math.max(buddyBest, score) : null,
+        counted: known
       });
     }
 

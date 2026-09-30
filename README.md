@@ -18,7 +18,7 @@ assets/
   icons/                favicon / apple-touch-icon / manifest icons
   og.png                link preview image
 api/
-  scores.mjs            GET/POST shared scoreboard (one best row per player, per-buddy boards)
+  scores.mjs            GET/POST shared scoreboard (per-buddy bests; the main board averages them)
   reset.mjs             POST admin wipe of the current season's board
 ```
 
@@ -87,3 +87,30 @@ A flat rate paid Chill 60 against Storm's 24, which made the gentlest setting
 the highest-scoring one at any realistic score. Note the shared board still
 mixes all four mode/difficulty combinations into one ranking, and Endless never
 earns the survival pot at all — separate boards are the fix, not done yet.
+
+## The shared board
+
+The per-buddy sorted sets (`fall:b:<buddy>`, one best per player per character)
+are the only thing stored. The main board is derived from them on read:
+
+```
+average = (sum of your best with each character) / 19
+```
+
+Divided by the whole roster, not by however many you have tried, so characters
+you have never played count as zero. One lucky run with one buddy is worth
+300/19 ≈ 15.8; being decently good with eight of them beats it comfortably. The
+only way up is to go and get good with somebody new, and a bad run can never
+cost you anything, because only your best with each character counts.
+
+Deriving it rather than keeping a second sorted set in step means the board can
+never disagree with the per-buddy boards, and it needed no migration when it
+stopped being a max and started being a mean. The old `fall:best` key is left
+alone and simply no longer read.
+
+`ROSTER` in `api/scores.mjs` is the divisor and **must be kept in step with
+`CHARS` in `src/game.js`**. A character missing from it still gets its own
+per-buddy board but contributes nothing to the main one.
+
+Picking a single buddy from the dropdown still shows plain best runs for that
+character — averaging is only how the overall board ranks.

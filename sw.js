@@ -22,7 +22,7 @@
  * revalidate catches up on their second visit.
  */
 
-const VERSION = 'fall-v2';
+const VERSION = 'fall-v3';
 const CORE = VERSION + '-core';
 const RUNTIME = VERSION + '-runtime';
 
