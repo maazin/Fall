@@ -36,13 +36,77 @@ const TOKEN =
   process.env.UPSTASH_REDIS_REST_TOKEN ||
   process.env.REDIS_REST_TOKEN;
 
-/* Seasons. Everything the board reads and writes sits under one prefix, and
-   BOARD_SEASON picks it. Bumping that env var in Vercel starts a completely
-   empty board without deleting anything: set it back to the old number and the
-   old rankings are exactly where they were. Season 1 uses the original key
-   names so nothing already on the board moves. */
-const SEASON = String(process.env.BOARD_SEASON || '1').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) || '1';
-const NS = SEASON === '1' ? 'fall:' : 'fall:s' + SEASON + ':';
+/* Seasons, a fortnight each, rolling on their own.
+ *
+ * Everything the board reads and writes sits under one prefix, so moving the
+ * prefix on is the whole reset: the new season starts empty and the old one is
+ * still sitting there untouched. The number comes from the clock rather than
+ * from anybody remembering to bump something.
+ *
+ * EPOCH is a Monday midnight UTC, so a season always turns over at the same
+ * time of the same weekday rather than drifting. BOARD_SEASON still overrides
+ * everything if you ever need to pin or replay one by hand.
+ *
+ * Season keys are given a TTL on write. Without one, every fortnight would
+ * leave its sorted sets behind for ever; 60 days keeps the last few seasons
+ * around to look at and lets the rest fall off on their own. */
+const FORTNIGHT = 14 * 24 * 60 * 60 * 1000;
+const EPOCH = Date.UTC(2026, 0, 5);          // Monday 5 January 2026, 00:00 UTC
+const SEASON_TTL = 60 * 24 * 60 * 60;        // seconds
+
+function seasonNumber(now) {
+  return Math.max(1, Math.floor(((now === undefined ? Date.now() : now) - EPOCH) / FORTNIGHT) + 1);
+}
+function seasonEnds(n) {
+  return new Date(EPOCH + n * FORTNIGHT).toISOString();
+}
+
+const PINNED = String(process.env.BOARD_SEASON || '').replace(/[^0-9]/g, '');
+const SEASON_N = PINNED ? Number(PINNED) : seasonNumber();
+const SEASON = String(SEASON_N);
+const NS = 'fall:s' + SEASON + ':';
+
+/* How the top player is decided, rotated one per season.
+ *
+ * Add any of 'best', 'buddies' or 'top5' to this list and the board will start
+ * alternating between them a fortnight at a time; with a single entry it is
+ * simply that one every season. Every ranking here is computed from the
+ * per-buddy bests that are already stored, so none of them needs the client to
+ * send anything extra. */
+const SEASON_CRITERIA = ['average'];
+
+const CRITERIA = {
+  average: {
+    label: 'Squad average',
+    blurb: 'Your best with each character, averaged over the whole roster. Ones you have never played count as zero.',
+    // floored: a leaderboard reads better in whole numbers
+    score: (p, roster) => Math.floor(p.sum / roster)
+  },
+  best: {
+    label: 'Best single run',
+    blurb: 'Your highest score with anybody. One brilliant run is all that counts.',
+    score: (p) => p.best
+  },
+  buddies: {
+    label: 'Buddies played',
+    blurb: 'How many different characters you have scored with. Ties go to the better squad average.',
+    score: (p) => p.buddies,
+    tie: (p, roster) => p.sum / roster
+  },
+  top5: {
+    label: 'Top five average',
+    blurb: 'The mean of your five best characters, so the ones you have not played cannot drag you down.',
+    score: (p) => {
+      const top = p.scores.slice().sort((a, b) => b - a).slice(0, 5);
+      return top.length ? Math.floor(top.reduce((a, b) => a + b, 0) / top.length) : 0;
+    }
+  }
+};
+
+function criterionFor(n) {
+  const key = SEASON_CRITERIA[(n - 1) % SEASON_CRITERIA.length] || 'average';
+  return { key: key, def: CRITERIA[key] || CRITERIA.average };
+}
 
 const ZKEY = NS + 'best';    // legacy: the old max-score board, no longer read
 const HKEY = NS + 'meta';
@@ -62,7 +126,8 @@ const TOP = 20;
 const ROSTER = [
   'mooni', 'omar', 'mamu', 'pineapple', 'blueberry-cow', 'bessie', 'mel',
   'cheryl', 'ronnie', 'connor', 'lazy-harp-seal', 'me', 'devin',
-  'grandpa-herbie', 'sophie', 'carrie', 'butt-nugget', 'pip', 'pep'
+  'grandpa-herbie', 'sophie', 'carrie', 'butt-nugget', 'pip', 'pep',
+  'ronnie-s-milk'
 ];
 
 function slugify(name) {
@@ -91,9 +156,10 @@ async function overallRows() {
       const val = Number(flat[j + 1]);
       if (!Number.isFinite(val) || val <= 0) continue;
       let p = players.get(name);
-      if (!p) { p = { name, sum: 0, buddies: 0, best: 0, bestBuddy: null }; players.set(name, p); }
+      if (!p) { p = { name, sum: 0, buddies: 0, best: 0, bestBuddy: null, scores: [] }; players.set(name, p); }
       p.sum += val;
       p.buddies++;
+      p.scores.push(val);
       if (val > p.best) { p.best = val; p.bestBuddy = slug; }
     }
   });
@@ -104,14 +170,14 @@ async function overallRows() {
     try { meta[metaFlat[i]] = JSON.parse(metaFlat[i + 1]); } catch (e) { /* ignore */ }
   }
 
+  const c = criterionFor(SEASON_N);
   return [...players.values()]
     .map((p) => {
       const m = meta[p.name] || {};
       return {
         name: p.name,
-        // two decimals of resolution: dividing by nineteen makes the
-        // differences between good players small
-        score: Math.round((p.sum / ROSTER.length) * 100) / 100,
+        score: c.def.score(p, ROSTER.length),
+        tie: c.def.tie ? c.def.tie(p, ROSTER.length) : 0,
         buddies: p.buddies,
         roster: ROSTER.length,
         best: p.best,
@@ -121,7 +187,7 @@ async function overallRows() {
         at: m.at || null
       };
     })
-    .sort((a, b) => b.score - a.score || b.buddies - a.buddies)
+    .sort((a, b) => b.score - a.score || b.tie - a.tie || b.buddies - a.buddies)
     .slice(0, TOP);
 }
 
@@ -190,9 +256,13 @@ export default async function handler(req, res) {
       }
 
       const rows = await overallRows();
+      const c = criterionFor(SEASON_N);
       return res.status(200).json({
         season: SEASON,
-        scoring: 'average',
+        seasonEnds: seasonEnds(SEASON_N),
+        scoring: c.key,
+        scoringLabel: c.def.label,
+        scoringBlurb: c.def.blurb,
         roster: ROSTER.length,
         rows: rows
       });
@@ -234,17 +304,21 @@ export default async function handler(req, res) {
         if (s2 === slug) buddyBest = (raw === null || raw === undefined) ? -1 : Number(raw);
       });
 
-      const round2 = (n) => Math.round(n * 100) / 100;
-      const wasAvg = round2(sum / ROSTER.length);
+      // floored, to match how the board shows it
+      const avg = (total) => Math.floor(total / ROSTER.length);
+      const wasAvg = avg(sum);
       const beatBuddy = !!bk && score > buddyBest;
       // beating your own best with one character lifts the average by the
       // difference, spread over the whole roster
-      const nowAvg = beatBuddy
-        ? round2((sum - Math.max(0, buddyBest) + score) / ROSTER.length)
-        : wasAvg;
+      const nowAvg = beatBuddy ? avg(sum - Math.max(0, buddyBest) + score) : wasAvg;
 
       const writes = [];
       if (beatBuddy) writes.push(['ZADD', bk, String(score), name]);
+      /* Every season leaves its keys behind, so they are given a life. Reset on
+         each write rather than only on create, so a season stays for 60 days
+         after its last post rather than 60 days after its first. */
+      if (bk) writes.push(['EXPIRE', bk, String(SEASON_TTL)]);
+      writes.push(['EXPIRE', HKEY, String(SEASON_TTL)]);
       {
         // the date is "last seen", so it is written whether or not they improved
         writes.push(['HSET', HKEY, name, JSON.stringify({
@@ -256,9 +330,13 @@ export default async function handler(req, res) {
       if (writes.length) await redis(writes);
 
       const known = ROSTER.indexOf(slug) > -1;
+      const c = criterionFor(SEASON_N);
       return res.status(200).json({
         ok: true,
-        scoring: 'average',
+        season: SEASON,
+        seasonEnds: seasonEnds(SEASON_N),
+        scoring: c.key,
+        scoringLabel: c.def.label,
         roster: ROSTER.length,
         improved: beatBuddy && nowAvg > wasAvg,
         average: nowAvg,

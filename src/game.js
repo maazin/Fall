@@ -22,7 +22,12 @@
     { name: 'Carrie', src: 'assets/buddies/carrie.webp' },
     { name: 'Butt Nugget', src: 'assets/buddies/butt-nugget.webp' },
     { name: 'Pip', src: 'assets/buddies/pip.webp' },
-    { name: 'Pep', src: 'assets/buddies/pep.webp' }
+    { name: 'Pep', src: 'assets/buddies/pep.webp' },
+    /* Appended, not slotted in beside Ronnie. The squad book and the per-buddy
+       bests are keyed by position in this array, so inserting anywhere but the
+       end would silently re-label everybody's saved records. He lives behind
+       Ronnie's tile instead, which is where you find him anyway. */
+    { name: "Ronnie's Milk", src: 'assets/buddies/ronnies-milk.webp' }
   ];
 
   /* ---------------- buddy perks ----------------
@@ -66,9 +71,9 @@
                         webTime:1.7,
                         long:'Friends you miss land in a web on the ground and wait 1.7 seconds instead of vanishing, so you can stroll over and collect them. Each one you rescue out of the web pays 1 extra point. She is the only buddy who gets a second chance at a drop.' },
 
-    'Ronnie':         { t:'Moo Muscle',     d:'One extra heart',
-                        hearts:1, heartLuck:2.4,
-                        long:'You start with one heart more than the difficulty gives, and heart bubbles are far more likely to drop whenever you are hurt.' },
+    'Ronnie':         { t:'Moo Muscle',     d:'One extra heart, and his milk',
+                        hearts:1, heartLuck:2.4, pairOnly:1, pairPay:3,
+                        long:'You start with one heart more than the difficulty gives, and heart bubbles are far more likely to drop whenever you are hurt. The squad stays home for Ronnie: the only thing that falls for him is his own milk, every carton pays 3 on top of your streak, and nobody playing anybody else will ever see one. He does not turn up in their skies either. Rain, lightning, stars and bubbles come down as usual \u2014 it is only the friends that are all milk.' },
 
     'Connor':         { t:'Storm Chaser',   d:'Late storm, long blaster',
                         storm:14, blastBoost:1.6,
@@ -108,14 +113,20 @@
 
     'Pep':            { t:'Bounce Back',    d:'Losing a heart starts 3s of x2',
                         rally:3.0,
-                        long:'Getting hit only makes her try harder. Every time she loses a heart, a three second burst of double points kicks in on the spot, the same one the x2 bubble gives you, so a bad moment turns straight into a scoring window if you keep catching through it. Shields do not count: it has to hurt.' }
+                        long:'Getting hit only makes her try harder. Every time she loses a heart, a three second burst of double points kicks in on the spot, the same one the x2 bubble gives you, so a bad moment turns straight into a scoring window if you keep catching through it. Shields do not count: it has to hurt.' },
+
+    "Ronnie's Milk":  { t:'Cream of the Crop', d:'Ronnie comes running, and pays',
+                        pairOnly:1, pairPay:4, heartLuck:1.6,
+                        long:'A carton of milk is no good on its own, so it calls Ronnie and nobody else: every single friend that falls is him, and each one pays 4 on top of your streak. Playing the milk is the only way to see him fall at all, the same way he is the only one who ever sees a carton. Hazards and bubbles are unchanged, so the sky still has everything in it except other squishmallows.' }
   };
 
   const NO_PERK = { t:'Squishy', d:'A good all-rounder' };
   const ME_INDEX = CHARS.map(function(c){ return c.name; }).indexOf('ME');
   const DEVIN_INDEX = CHARS.map(function(c){ return c.name; }).indexOf('Devin');
   // ME is envious of the cows specifically, so those are the only faces she wears
-  const COWS = ['Mooni', 'Blueberry Cow', 'Ronnie', 'Connor'];
+  // Ronnie is off this list: he falls only for his milk, so a mimic wearing his
+  // face would be the one way to see him in anybody else's sky
+  const COWS = ['Mooni', 'Blueberry Cow', 'Connor'];
   const COW_IDS = COWS.map(function(n){
     return CHARS.map(function(c){ return c.name; }).indexOf(n);
   }).filter(function(i){ return i >= 0; });
@@ -123,8 +134,31 @@
      Neither of them ever falls from the sky either: whichever one you are not
      playing is folded away inside the one you are. */
   const TWIN_IDS = [ME_INDEX, DEVIN_INDEX].filter(function(i){ return i >= 0; });
+
+  const RONNIE_INDEX = CHARS.map(function(c){ return c.name; }).indexOf('Ronnie');
+  const MILK_INDEX = CHARS.map(function(c){ return c.name; }).indexOf("Ronnie's Milk");
+  /* Ronnie and his milk fall for each other and for nobody else. Neither of
+     them is in the pool everyone draws from, so the only player who ever sees
+     the milk is Ronnie, and the only player who ever sees Ronnie is the milk.
+     Each one reaches the other through pairRate in spawn(). */
+  const PRIVATE_IDS = [RONNIE_INDEX, MILK_INDEX].filter(function(i){ return i >= 0; });
+
+  /* Tiles that hide a second character behind them: two taps swaps which one
+     is out. The twins share a plush; Ronnie and his milk come as a set. */
+  const SWAP_PAIRS = [[ME_INDEX, DEVIN_INDEX], [RONNIE_INDEX, MILK_INDEX]]
+    .filter(function(p){ return p[0] >= 0 && p[1] >= 0; });
+  // the one of each pair that gets no tile of its own
+  const HIDDEN_IDS = SWAP_PAIRS.map(function(p){ return p[1]; });
+  function swapPartner(i){
+    for(let k = 0; k < SWAP_PAIRS.length; k++){
+      if(SWAP_PAIRS[k][0] === i) return SWAP_PAIRS[k][1];
+      if(SWAP_PAIRS[k][1] === i) return SWAP_PAIRS[k][0];
+    }
+    return -1;
+  }
+
   const FALLABLE = CHARS.map(function(c, i){ return i; })
-    .filter(function(i){ return TWIN_IDS.indexOf(i) < 0; });
+    .filter(function(i){ return TWIN_IDS.indexOf(i) < 0 && PRIVATE_IDS.indexOf(i) < 0; });
   function perkOf(i){ return PERKS[CHARS[i].name] || NO_PERK; }
 
   const app = document.getElementById('app');
@@ -919,14 +953,12 @@
 
   /* Devin gets no tile of his own. He lives behind his sister's and shoves her
      out of the way when you tap her twice, which is roughly how they get on. */
-  const TWINS = TWIN_IDS;
-
   function fillTile(b, i){
     const c = CHARS[i], pk = PERKS[c.name] || NO_PERK;
     b.dataset.ci = i;
     b.innerHTML = '<img src="' + c.src + '" alt=""><span>' + c.name + '</span>' +
       '<span class="perk"><b>' + pk.t + '</b>' + pk.d + '</span>' +
-      (TWINS.length === 2 && TWINS.indexOf(i) > -1 ? '<span class="twin">2 taps</span>' : '');
+      (swapPartner(i) >= 0 ? '<span class="twin">2 taps</span>' : '');
   }
 
   function selectTile(b){
@@ -938,7 +970,8 @@
   }
 
   CHARS.forEach(function(c, i){
-    if(i === DEVIN_INDEX) return;
+    // the second of each pair has no tile: it lives behind the first one
+    if(HIDDEN_IDS.indexOf(i) > -1) return;
     const b = document.createElement('button');
     b.className = 'buddy' + (i === 0 ? ' sel' : '');
     b.type = 'button';
@@ -947,11 +980,13 @@
     b.addEventListener('click', function(){
       const cur = +b.dataset.ci;
       const now = performance.now();
-      // two taps inside 420ms on the twins' tile swaps whichever one is home.
-      // timed off clicks rather than dblclick so a double tap on a phone works
-      if(TWINS.length === 2 && TWINS.indexOf(cur) > -1 && now - lastTap < 420){
+      /* Two taps inside 420ms on a shared tile swaps whichever one is home:
+         ME and Devin, Ronnie and his milk. Timed off clicks rather than
+         dblclick, so a double tap on a phone works. */
+      const mate = swapPartner(cur);
+      if(mate >= 0 && now - lastTap < 420){
         lastTap = 0;
-        fillTile(b, cur === ME_INDEX ? DEVIN_INDEX : ME_INDEX);
+        fillTile(b, mate);
         selectTile(b);
         b.classList.remove('swap'); void b.offsetWidth; b.classList.add('swap');
         sfx.mischief(); buzz(HAPTIC.mimic);
@@ -1128,12 +1163,13 @@
         }
         if(res.j.buddyImproved){
           const up = res.j.improved
-            ? ' Squad average now ' + fmtScore(res.j.average) + '.'
+            ? ' ' + (res.j.scoringLabel || 'Squad average') + ' now ' + fmtScore(res.j.average) + '.'
             : '';
           note(postNote, 'New best with ' + CHARS[picked].name + '!' + up, 'good');
         } else {
           note(postNote, 'Your best with ' + CHARS[picked].name + ' is still ' +
-            res.j.buddyBest + '. Squad average ' + fmtScore(res.j.average) + '.', '');
+            res.j.buddyBest + '. ' + (res.j.scoringLabel || 'Squad average') + ' ' +
+            fmtScore(res.j.average) + '.', '');
         }
       })
       .catch(function(){ note(postNote, 'Could not reach the global board.', 'bad'); });
@@ -1222,10 +1258,16 @@
             '<b>' + fmtScore(e.score) + '</b>';
           globalList.appendChild(li);
         });
-        note(globalNote, avgBoard
-          ? 'Ranked by your average across all ' + ((rows[0] && rows[0].roster) || 19) +
-            ' buddies. Ones you have never played count as zero.'
-          : 'Best run with this buddy.' + (playerName ? ' Posting as ' + playerName : ''));
+        if(avgBoard){
+          const left = untilReset(res.j.seasonEnds);
+          note(globalNote,
+            'Season ' + (res.j.season || '?') + ' \u00B7 ' +
+            (res.j.scoringLabel || 'Squad average') +
+            (left ? ' \u00B7 ' + left : '') + '. ' +
+            (res.j.scoringBlurb || ''));
+        } else {
+          note(globalNote, 'Best run with this buddy.' + (playerName ? ' Posting as ' + playerName : ''));
+        }
       })
       .catch(function(){
         globalList.innerHTML = '<li class="empty">Board unavailable</li>';
@@ -1246,12 +1288,20 @@
     for(let i = 0; i < CHARS.length; i++) if(slugOf(CHARS[i].name) === want) return CHARS[i];
     return null;
   }
-  /* An average over nineteen characters lands on small numbers with meaningful
-     decimals, so they are worth showing; a plain best never has any. */
+  // the board deals in whole numbers; the API floors, this is belt and braces
   function fmtScore(n){
     const v = Number(n);
-    if(!isFinite(v)) return '0';
-    return v % 1 === 0 ? String(v) : v.toFixed(1);
+    return isFinite(v) ? String(Math.floor(v)) : '0';
+  }
+  /* How long this fortnight has left, for the line under the board. */
+  function untilReset(iso){
+    const end = Date.parse(iso);
+    if(!isFinite(end)) return '';
+    const mins = Math.max(0, Math.round((end - Date.now()) / 60000));
+    if(mins < 60) return 'resets in ' + mins + ' min';
+    const hrs = Math.round(mins / 60);
+    if(hrs < 48) return 'resets in ' + hrs + ' hour' + (hrs === 1 ? '' : 's');
+    return 'resets in ' + Math.round(hrs / 24) + ' days';
   }
 
   // names come back from a server other people write to, so never trust them as markup
@@ -1267,7 +1317,7 @@
     { id:'streak20',  t:'On a roll',   d:'Reach a x4 streak of 20 catches without a hit',                      ico:'\u26A1' },
     { id:'storm2',    t:'Storm rider', d:'Survive the boss untouched on Normal or Storm',                     ico:'\u26C8\uFE0F' },
     { id:'score100',  t:'Centurion',   d:'Score 100 in a single run',                                         ico:'\u2B50' },
-    { id:'allsquad',  t:'Full squad',  d:'Catch every buddy that falls from the sky (the twins never do)',     ico:'\uD83C\uDFC6' },
+    { id:'allsquad',  t:'Full squad',  d:'Catch every buddy that falls for everyone (the twins and Ronnie\u2019s pair keep to themselves)', ico:'\uD83C\uDFC6' },
     { id:'endless150',t:'Marathon',    d:'Last two and a half minutes in Endless',                            ico:'\u23F1\uFE0F' },
     { id:'mimic8',    t:'Sparkle thief',d:'Catch 8 of ME\u2019s sparkle mimics in one run',                    ico:'\u2728' },
     { id:'popper14',  t:'Cloud buster',d:'Blast 14 clouds out of the sky in a single run',                    ico:'\uD83E\uDEE7' },
@@ -1289,10 +1339,15 @@
       const n = squad[i] || 0;
       const pb = buddyBest[i] || 0;
       const twin = TWIN_IDS.indexOf(i) > -1;
+      const mateOf = PRIVATE_IDS.indexOf(i) > -1 ? swapPartner(i) : -1;
       const d = document.createElement('div');
       d.className = 'sq' + ((n || pb) ? '' : ' locked');
       d.innerHTML = '<img src="' + c.src + '" alt=""><span>' + c.name + '</span><b>' +
-        (pb ? 'best ' + pb : (n ? n + ' caught' : (twin ? 'never falls' : 'not yet'))) + '</b>';
+        (pb ? 'best ' + pb
+            : n ? n + ' caught'
+            : twin ? 'never falls'
+            : mateOf >= 0 ? 'only for ' + CHARS[mateOf].name
+            : 'not yet') + '</b>';
       grid.appendChild(d);
     });
     const brow = document.getElementById('badgeRow');
@@ -1756,7 +1811,13 @@
       el.innerHTML = '<div class="art"><img src="' + CHARS[dis].src + '" alt="">' +
         '<span class="spk s1"></span><span class="spk s2"></span><span class="spk s3"></span></div>';
     } else if(kind === 'friend'){
-      ci = FALLABLE[(Math.random() * FALLABLE.length) | 0];
+      /* Your other half comes looking for you, and for nobody else. pairOnly
+         means the squad stays home entirely: every friend that falls is the
+         partner. Hazards, stars and bubbles are untouched by this. */
+      const mate = (perk.pairOnly || perk.pairRate) ? swapPartner(picked) : -1;
+      ci = (mate >= 0 && (perk.pairOnly || Math.random() < perk.pairRate))
+        ? mate
+        : FALLABLE[(Math.random() * FALLABLE.length) | 0];
       el.innerHTML = '<div class="art"><img src="' + CHARS[ci].src + '" alt=""></div>';
     } else if(kind === 'star'){
       el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%;filter:drop-shadow(0 0 10px rgba(255,197,60,.9))">' +
@@ -2224,7 +2285,8 @@
       // flat and unmultiplied, so a x4 streak pays 5 rather than 8
       // a friend rescued off the ground out of Cheryl's web is worth extra
       const webSave = (f.webbed && perk.webTime) ? 1 : 0;
-      const fv = m + (perk.friendBonus || 0) + webSave;
+      const mateBonus = (perk.pairPay && f.ci === swapPartner(picked)) ? perk.pairPay : 0;
+      const fv = m + (perk.friendBonus || 0) + webSave + mateBonus;
       score += fv;
       floatText(m > 1 ? '+' + fv + '  x' + m : '+' + fv, cx, cy);
       burst(cx, cy, ['#FF4F9A','#2FCBBD','#FFC53C','#8C6BFF','#FFF'], 16);

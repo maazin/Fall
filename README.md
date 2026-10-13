@@ -58,8 +58,35 @@ catches up on their next visit.
 ## Adding a buddy
 
 1. Drop a `.webp` into `assets/buddies/`.
-2. Add a `{ name, src }` entry to `CHARS` at the top of `src/game.js`.
-3. Optionally give it a perk in `PERKS` (keyed by the same name).
+2. **Append** a `{ name, src }` entry to `CHARS` at the top of `src/game.js`.
+   Append, never insert: the squad book and the per-buddy bests are keyed by
+   position in that array, so slotting one into the middle silently re-labels
+   every record after it.
+3. Add the slug to `ROSTER` in `api/scores.mjs`, which is the divisor for the
+   main board, and to `BUDDIES` in `sw.js` so it is cached offline.
+4. Optionally give it a perk in `PERKS` (keyed by the same name).
+
+### Pairs
+
+Two characters can share one tile, swapped by tapping it twice: ME and Devin,
+and Ronnie and his milk. Add a `[a, b]` to `SWAP_PAIRS` and the second of the
+pair loses its own tile and lives behind the first.
+
+A pair can also fall for each other, and only for each other. `pairOnly` makes
+every single friend drop the partner, `pairRate` makes it a share of them, and
+`pairPay` is what catching them is worth on top of the streak.
+
+Ronnie and his milk are both in `PRIVATE_IDS`, which keeps them out of
+`FALLABLE`, so neither appears in anybody else's sky; `pairOnly` is what puts
+them in each other's. Play Ronnie and the only squishmallow that falls is a
+carton of milk; play the milk and the only one that falls is Ronnie. Hazards,
+stars and bubbles are untouched by any of this, so the sky still has everything
+in it except other characters.
+
+Two consequences worth knowing: Ronnie came off the `COWS` list that ME's
+mimics wear, because a mimic in his face would have been the one way to see him
+in somebody else's sky; and the Full squad badge counts `FALLABLE`, so it no
+longer asks for either of the pair.
 
 ## Deploying
 
@@ -90,16 +117,29 @@ earns the survival pot at all — separate boards are the fix, not done yet.
 
 ## The shared board
 
+Seasons last a fortnight and roll over on their own: the number comes from the
+clock, anchored to a Monday midnight UTC so it always turns at the same time of
+the same weekday, and every key sits under `fall:s<n>:`. Moving the prefix on is
+the whole reset. Old seasons are given a 60-day TTL so they do not pile up.
+`BOARD_SEASON` still overrides if you want to pin or replay one.
+
+`SEASON_CRITERIA` in `api/scores.mjs` lists the rankings the board rotates
+through, one per season. It currently holds a single entry, so every season is
+the squad average; add `'best'`, `'buddies'` or `'top5'` and it starts
+alternating a fortnight at a time. All four are already implemented and all are
+computed from the per-buddy bests, so none needs a bigger score payload.
+
 The per-buddy sorted sets (`fall:b:<buddy>`, one best per player per character)
 are the only thing stored. The main board is derived from them on read:
 
 ```
-average = (sum of your best with each character) / 19
+average = floor( (sum of your best with each character) / 20 )
 ```
 
 Divided by the whole roster, not by however many you have tried, so characters
-you have never played count as zero. One lucky run with one buddy is worth
-300/19 ≈ 15.8; being decently good with eight of them beats it comfortably. The
+you have never played count as zero, and floored, because a leaderboard reads
+better in whole numbers. One lucky run with one buddy is worth 300/20 = 15;
+being decently good with eight of them beats it comfortably at 84. The
 only way up is to go and get good with somebody new, and a bad run can never
 cost you anything, because only your best with each character counts.
 
@@ -109,7 +149,7 @@ stopped being a max and started being a mean. The old `fall:best` key is left
 alone and simply no longer read.
 
 `ROSTER` in `api/scores.mjs` is the divisor and **must be kept in step with
-`CHARS` in `src/game.js`**. A character missing from it still gets its own
+`CHARS` in `src/game.js`** (twenty characters as of Ronnie's Milk). A character missing from it still gets its own
 per-buddy board but contributes nothing to the main one.
 
 Picking a single buddy from the dropdown still shows plain best runs for that

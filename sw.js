@@ -22,14 +22,15 @@
  * revalidate catches up on their second visit.
  */
 
-const VERSION = 'fall-v3';
+const VERSION = 'fall-v4';
 const CORE = VERSION + '-core';
 const RUNTIME = VERSION + '-runtime';
 
 const BUDDIES = [
   'mooni', 'omar', 'mamu', 'pineapple', 'blueberry-cow', 'bessie', 'mel',
   'cheryl', 'ronnie', 'connor', 'lazy-harp-seal', 'me', 'devin',
-  'grandpa-herbie', 'sophie', 'carrie', 'butt-nugget', 'pip', 'pep'
+  'grandpa-herbie', 'sophie', 'carrie', 'butt-nugget', 'pip', 'pep',
+  'ronnies-milk'
 ].map(function (n) { return 'assets/buddies/' + n + '.webp'; });
 
 const PRECACHE = [
