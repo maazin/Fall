@@ -20,6 +20,7 @@ assets/
 api/
   scores.mjs            GET/POST shared scoreboard (per-buddy bests; the main board averages them)
   reset.mjs             POST admin wipe of the current season's board
+  _board.mjs            seasons and the Redis key prefix, shared by both routes
 ```
 
 ## Running locally
@@ -118,7 +119,7 @@ Push to GitHub with the repo connected to Vercel. Environment variables:
 | Variable | Purpose |
 | --- | --- |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Redis REST credentials for the scoreboard (the Upstash / `REDIS_REST_*` names are accepted too). Without them the board is disabled. |
-| `BOARD_SEASON` | Optional. Bump to start a fresh, empty board without deleting the old one; set it back to restore. |
+| `BOARD_SEASON` | Optional. Pins the board to one season number instead of following the clock; unset to go back to the fortnightly rollover. |
 | `ADMIN_TOKEN` | Optional. Enables `POST /api/reset` with an `x-admin-token` header. Unset means the route refuses everything. |
 
 ## Scoring
@@ -145,6 +146,22 @@ clock, anchored to a Monday midnight UTC so it always turns at the same time of
 the same weekday, and every key sits under `fall:s<n>:`. Moving the prefix on is
 the whole reset. Old seasons are given a 60-day TTL so they do not pile up.
 `BOARD_SEASON` still overrides if you want to pin or replay one.
+
+### Resetting the board
+
+Two ways, and both act on the season that is live right now:
+
+- **Bump `BOARD_RESET` in `api/_board.mjs` and deploy.** It is part of the key
+  prefix, so the board is empty from the moment the deploy lands. Nothing is
+  deleted: the old keys run out on their TTL, and setting the number back brings
+  them straight back. The fortnightly rollover carries on on schedule.
+- **`POST /api/reset`** with an `x-admin-token` header matching `ADMIN_TOKEN`.
+  This one does delete.
+
+Both routes take the prefix from `_board.mjs`. They used to work it out
+separately, and after the move to seasons the reset route was deleting the old
+pre-season keys while the live board sat untouched under a prefix it never
+looked at, still answering 200.
 
 `SEASON_CRITERIA` in `api/scores.mjs` lists the rankings the board rotates
 through, one per season. It currently holds a single entry, so every season is

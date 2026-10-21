@@ -9,9 +9,18 @@
  * With no ADMIN_TOKEN set the route refuses every request, so it cannot be
  * hit by accident or by anybody who finds the URL.
  *
- * If you would rather not delete anything, bump BOARD_SEASON in Vercel
- * instead. That starts a fresh empty board and keeps the old one intact.
+ * This wipes the season that is live right now, the same keys scores.mjs is
+ * reading and writing: both get the prefix from _board.mjs. (They used to
+ * work it out separately, and after the move to fortnightly seasons this
+ * route was quietly deleting the old pre-season keys while the live board
+ * went untouched.)
+ *
+ * If you would rather not delete anything, bump BOARD_RESET in _board.mjs
+ * and deploy instead. That empties the board just the same and keeps the old
+ * one intact.
  */
+
+import { currentSeason, namespace } from './_board.mjs';
 
 const URL_ =
   process.env.KV_REST_API_URL ||
@@ -25,8 +34,8 @@ const TOKEN =
 
 const ADMIN = process.env.ADMIN_TOKEN;
 
-const SEASON = String(process.env.BOARD_SEASON || '1').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) || '1';
-const NS = SEASON === '1' ? 'fall:' : 'fall:s' + SEASON + ':';
+const SEASON = String(currentSeason(process.env));
+const NS = namespace(SEASON);
 
 async function redis(commands) {
   const res = await fetch(URL_ + '/pipeline', {
@@ -73,7 +82,8 @@ export default async function handler(req, res) {
 
   try {
     // every per-buddy board, found by scanning rather than guessing names
-    const keys = [NS + 'best', NS + 'meta'];
+    // the board is the per-buddy sets plus meta; there is no 'best' key any more
+    const keys = [NS + 'meta'];
     let cursor = '0';
     let guard = 0;
     do {

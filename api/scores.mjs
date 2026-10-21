@@ -26,6 +26,8 @@
  * Accepts either env var naming the Vercel marketplace hands out.
  */
 
+import { SEASON_TTL, seasonEnds, currentSeason, namespace } from './_board.mjs';
+
 const URL_ =
   process.env.KV_REST_API_URL ||
   process.env.UPSTASH_REDIS_REST_URL ||
@@ -36,35 +38,12 @@ const TOKEN =
   process.env.UPSTASH_REDIS_REST_TOKEN ||
   process.env.REDIS_REST_TOKEN;
 
-/* Seasons, a fortnight each, rolling on their own.
- *
- * Everything the board reads and writes sits under one prefix, so moving the
- * prefix on is the whole reset: the new season starts empty and the old one is
- * still sitting there untouched. The number comes from the clock rather than
- * from anybody remembering to bump something.
- *
- * EPOCH is a Monday midnight UTC, so a season always turns over at the same
- * time of the same weekday rather than drifting. BOARD_SEASON still overrides
- * everything if you ever need to pin or replay one by hand.
- *
- * Season keys are given a TTL on write. Without one, every fortnight would
- * leave its sorted sets behind for ever; 60 days keeps the last few seasons
- * around to look at and lets the rest fall off on their own. */
-const FORTNIGHT = 14 * 24 * 60 * 60 * 1000;
-const EPOCH = Date.UTC(2026, 0, 5);          // Monday 5 January 2026, 00:00 UTC
-const SEASON_TTL = 60 * 24 * 60 * 60;        // seconds
-
-function seasonNumber(now) {
-  return Math.max(1, Math.floor(((now === undefined ? Date.now() : now) - EPOCH) / FORTNIGHT) + 1);
-}
-function seasonEnds(n) {
-  return new Date(EPOCH + n * FORTNIGHT).toISOString();
-}
-
-const PINNED = String(process.env.BOARD_SEASON || '').replace(/[^0-9]/g, '');
-const SEASON_N = PINNED ? Number(PINNED) : seasonNumber();
+/* Seasons, the reset generation and the key prefix all live in _board.mjs,
+   shared with reset.mjs so the two can never disagree about where the board
+   is. See that file for how the fortnight works. */
+const SEASON_N = currentSeason(process.env);
 const SEASON = String(SEASON_N);
-const NS = 'fall:s' + SEASON + ':';
+const NS = namespace(SEASON_N);
 
 /* How the top player is decided, rotated one per season.
  *
