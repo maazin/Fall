@@ -70,14 +70,25 @@ catching it is how you recover from whatever the dark cost you.
 
 ## Offline
 
-`sw.js` precaches the page, the stylesheet, the script and all nineteen buddies,
-so the game is playable with no signal once it has been opened once. The
-scoreboard routes (`/api/*`) are never cached.
+`sw.js` precaches the page, the stylesheet, the script, every buddy and the
+weather sprites, so the game is playable with no signal once it has been opened
+once. The scoreboard routes (`/api/*`) are never cached.
 
-**Bump `VERSION` in `sw.js` on every deploy.** Precached files are keyed by it,
-so a new version re-fetches everything and drops the old cache; without a bump a
-returning player keeps the previous CSS and JS until a background refresh
-catches up on their next visit.
+Online, the game's files are always fetched fresh (network first, and the
+browser is told to revalidate rather than trust its own HTTP cache), so a deploy
+reaches players on their next visit and the page, the script and the art always
+match. The cache is only used offline, or when the network takes longer than
+`NET_WAIT` to answer. Bump `VERSION` in `sw.js` when the list of files changes,
+so the old cache is dropped; ordinary content changes no longer need a bump.
+
+## Weather art
+
+The rain, lightning, storm and bus sprites are standalone files in
+`assets/weather/`, each carrying its own gradients. They used to be inline SVG
+in `game.js` pointing at gradients defined once in `index.html`, which meant a
+phone running a cached `index.html` with a newer `game.js` drew them with no
+fill at all: a white outline with a face on it. To change one, edit its `.svg`
+directly.
 
 ## Adding a buddy
 

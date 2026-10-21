@@ -2,29 +2,42 @@
  *
  * The manifest, the icons and the standalone display mode were already here,
  * so "Add to Home Screen" gave you an app icon that white-screened without a
- * signal. This is the missing half: the whole game is 19 webp files, one CSS
- * and one JS, so all of it fits in a cache and none of it needs a network.
+ * signal. This is the missing half: the whole game is a handful of small files,
+ * so all of it fits in a cache and none of it needs a network.
  *
- * Strategy, in order of how much freshness matters:
+ * Strategy:
  *
  *   /api/*, /_vercel/*   never touched. The scoreboard has to be live, and a
  *                        cached score post would be a bug, not a feature.
- *   navigations          network first, cache as the fallback. A deploy shows
- *                        up on the next load rather than the one after.
- *   everything else      stale-while-revalidate: served from cache instantly,
- *                        refreshed in the background for next time.
- *   fonts.googleapis /   cached opportunistically, so offline gets Baloo
- *   fonts.gstatic        rather than falling back to Trebuchet.
+ *   the game's files     network first, cache as the fallback. Online, every
+ *                        file comes fresh, so the page, the script and the art
+ *                        always match each other; offline, or on a connection
+ *                        too slow to answer within NET_WAIT, the cached set is
+ *                        used instead.
+ *   fonts                stale-while-revalidate: they never change, so serve
+ *                        from cache and refresh quietly.
  *
- * BUMP `VERSION` ON EVERY DEPLOY. Precached files are keyed by it, so a new
- * version re-fetches the lot and drops the old cache on activate. Without a
- * bump, a returning player keeps the previous CSS and JS until the background
- * revalidate catches up on their second visit.
+ * It used to be cache first for the game's files, refreshing in the background.
+ * That meant every deploy reached a returning phone one visit late: the first
+ * visit after an update ran the previous game.js. When a new feature's art
+ * lived in one file and its code in another, a phone could run one new and one
+ * old, which is how Herbie's bus showed up on phones as a white outline with a
+ * face, or not at all. Network first makes that impossible while online.
+ *
+ * Only the game's own page is cached as the app shell. Every navigation used
+ * to be stored under "index.html", so opening any other page on this origin
+ * overwrote the shell with it.
+ *
+ * BUMP `VERSION` WHEN THE FILE LIST CHANGES, so the old cache is dropped. Content
+ * changes no longer need a bump to reach players; they come fresh regardless.
  */
 
-const VERSION = 'fall-v5';
+const VERSION = 'fall-v6';
 const CORE = VERSION + '-core';
 const RUNTIME = VERSION + '-runtime';
+
+// how long to wait for the network before falling back to the cached copy
+const NET_WAIT = 3500;
 
 const BUDDIES = [
   'mooni', 'omar', 'mamu', 'pineapple', 'blueberry-cow', 'bessie', 'mel',
@@ -32,6 +45,10 @@ const BUDDIES = [
   'grandpa-herbie', 'sophie', 'carrie', 'butt-nugget', 'pip', 'pep',
   'ronnies-milk'
 ].map(function (n) { return 'assets/buddies/' + n + '.webp'; });
+
+// the weather sprites carry their own colours, so each one is a whole file
+const WEATHER = ['rain', 'bolt', 'boss', 'bus']
+  .map(function (n) { return 'assets/weather/' + n + '.svg'; });
 
 const PRECACHE = [
   '.',
@@ -42,7 +59,7 @@ const PRECACHE = [
   'assets/icons/icon-180.png',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png'
-].concat(BUDDIES);
+].concat(BUDDIES, WEATHER);
 
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
@@ -71,6 +88,39 @@ self.addEventListener('activate', function (e) {
       .then(function () { return self.clients.claim(); })
   );
 });
+
+/* "Network first" is not enough on its own: the request still passes through
+   the browser's HTTP cache, which can decide its copy of yesterday's file is
+   fresh and hand it back without asking the server. 'no-cache' makes it ask
+   every time; when nothing has changed that is a tiny 304. Wrapping a page
+   navigation this way is fine: the spec turns its mode into same-origin and
+   keeps its redirect handling. */
+function freshFetch(req) {
+  return fetch(new Request(req, { cache: 'no-cache' }));
+}
+
+/* Fresh from the network if it answers in time, otherwise the cached copy.
+   A response that arrives after the timeout still refreshes the cache, so the
+   next visit has it. */
+function networkFirst(req, key) {
+  const cacheKey = key || req;
+  return caches.open(CORE).then(function (cache) {
+    const net = freshFetch(req).then(function (res) {
+      if (res && res.ok) cache.put(cacheKey, res.clone());
+      return res;
+    }).catch(function () { return null; });
+    const slow = new Promise(function (resolve) { setTimeout(resolve, NET_WAIT, null); });
+    return Promise.race([net, slow]).then(function (res) {
+      if (res) return res;
+      return cache.match(cacheKey).then(function (hit) {
+        // nothing cached either: wait for the network after all
+        return hit || net.then(function (r) {
+          return r || new Response('', { status: 504, statusText: 'offline' });
+        });
+      });
+    });
+  });
+}
 
 function staleWhileRevalidate(req, cacheName) {
   return caches.open(cacheName).then(function (cache) {
@@ -105,21 +155,14 @@ self.addEventListener('fetch', function (e) {
 
   if (url.origin !== location.origin) return;
 
-  // a navigation should show the newest build when there is a network
   if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req).then(function (res) {
-        const copy = res.clone();
-        caches.open(CORE).then(function (c) { c.put('index.html', copy); });
-        return res;
-      }).catch(function () {
-        return caches.match('index.html').then(function (hit) {
-          return hit || caches.match('.');
-        });
-      })
-    );
+    // only the game's own page is the app shell; any other page on this
+    // origin is left to the browser and never written over the shell
+    const shell = url.pathname === '/' || url.pathname === '/index.html';
+    if (!shell) return;
+    e.respondWith(networkFirst(req, 'index.html'));
     return;
   }
 
-  e.respondWith(staleWhileRevalidate(req, CORE));
+  e.respondWith(networkFirst(req));
 });

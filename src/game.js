@@ -1907,102 +1907,20 @@
       if(kind === 'purse') el.classList.add('purse');
       el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%;filter:drop-shadow(0 0 11px ' + glow + ')">' +
         '<circle cx="50" cy="50" r="46" fill="rgba(255,255,255,.34)" stroke="#fff" stroke-width="4"/>' + art + '</svg></div>';
+    /* The weather sprites are image files that carry their own colours, not
+       inline SVG pointing at gradients defined elsewhere in index.html. That
+       split meant a phone running a cached index.html with a newer game.js
+       (or the other way round) drew the sprite with no fill at all: a white
+       outline with a face on it. An <img> is also decoded once and reused,
+       where inline markup was parsed again on every spawn. */
     } else if(kind === 'bolt'){
       el.classList.add('bolt');
-      el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%">' +
-        // the soft halo the bolt throws, behind everything
-        '<ellipse cx="50" cy="78" rx="23" ry="20" fill="#FFD84D" opacity=".20"/>' +
-        // outline pass: the same lobes, white and a touch larger, so the
-        // silhouette gets one clean edge instead of seams between circles
-        '<g fill="#fff">' +
-          '<circle cx="32" cy="42" r="21"/><circle cx="53" cy="33" r="25"/>' +
-          '<circle cx="72" cy="43" r="19"/><rect x="12" y="40" width="76" height="24" rx="12"/>' +
-        '</g>' +
-        '<g fill="url(#gBolt)">' +
-          '<circle cx="32" cy="42" r="16.5"/><circle cx="53" cy="33" r="20.5"/>' +
-          '<circle cx="72" cy="43" r="14.5"/><rect x="17" y="41" width="66" height="18" rx="9"/>' +
-        '</g>' +
-        // plush volume: light gathers on top, the underside falls away
-        '<ellipse cx="46" cy="24" rx="15" ry="6" fill="#fff" opacity=".5"/>' +
-        '<ellipse cx="50" cy="56" rx="27" ry="6" fill="#6A73A6" opacity=".28"/>' +
-        // dizzy eyes, round-capped so they read as cute rather than dead
-        '<path d="M35 36l7 7M42 36l-7 7" stroke="#463063" stroke-width="3.6" stroke-linecap="round"/>' +
-        '<path d="M58 36l7 7M65 36l-7 7" stroke="#463063" stroke-width="3.6" stroke-linecap="round"/>' +
-        '<ellipse cx="28" cy="46" rx="5.4" ry="3.2" fill="#FF9CC8" opacity=".5"/>' +
-        '<ellipse cx="72" cy="46" rx="5.4" ry="3.2" fill="#FF9CC8" opacity=".5"/>' +
-        '<path d="M44 52q6-5 12 0" stroke="#463063" stroke-width="3.2" fill="none" stroke-linecap="round"/>' +
-        // the bolt: chunky, rounded, and warm rather than a flat yellow wedge
-        '<path d="M56 56L36 84h13l-5 16 24-31H55z" fill="url(#gGold)" stroke="#fff" ' +
-          'stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>' +
-        '<circle cx="45" cy="70" r="2" fill="#FFF8D8" opacity=".85"/>' +
-        '</svg></div>';
+      el.innerHTML = '<div class="art"><img src="assets/weather/bolt.svg" alt=""></div>';
     } else if(kind === 'bus'){
       el.classList.add('bus');
-      el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%">' +
-        // wheels first, so the body sits over their tops
-        '<g fill="#3D3352"><circle cx="24" cy="76" r="9"/><circle cx="77" cy="76" r="9"/></g>' +
-        '<g fill="#C9CCE0"><circle cx="24" cy="76" r="3.6"/><circle cx="77" cy="76" r="3.6"/></g>' +
-        // outline pass, then the body: the same single clean edge the clouds get
-        '<rect x="2" y="13" width="96" height="65" rx="15" fill="#fff"/>' +
-        '<rect x="6" y="17" width="88" height="57" rx="11.5" fill="url(#gBus)"/>' +
-        // the cream band between the decks is what makes it read as a London bus
-        '<rect x="6" y="39.5" width="88" height="4.6" fill="#FFF1D2"/>' +
-        // upper deck runs the whole length, over the cab; lower deck behind it
-        '<g fill="url(#gBusWin)">' +
-          '<rect x="11" y="23" width="17" height="13" rx="3.6"/><rect x="31" y="23" width="17" height="13" rx="3.6"/>' +
-          '<rect x="51" y="23" width="17" height="13" rx="3.6"/><rect x="71" y="23" width="17" height="13" rx="3.6"/>' +
-          '<rect x="35" y="48" width="16" height="13" rx="3.6"/><rect x="54" y="48" width="16" height="13" rx="3.6"/>' +
-          '<rect x="73" y="48" width="15" height="13" rx="3.6"/>' +
-        '</g>' +
-        '<path d="M14.5 33.5l5-7M34.5 33.5l5-7M54.5 33.5l5-7M74.5 33.5l5-7M38.5 58.5l5-7M57.5 58.5l5-7M76 58.5l5-7" ' +
-          'stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".8"/>' +
-        // a thin gold line along the skirt
-        '<rect x="34" y="65" width="56" height="2" rx="1" fill="#FFD27A" opacity=".85"/>' +
-        '<ellipse cx="44" cy="20.5" rx="28" ry="2.6" fill="#fff" opacity=".35"/>' +
-        // the cab is its face, and it is falling, so it looks alarmed about it
-        '<ellipse cx="14" cy="54" rx="3.3" ry="4.3" fill="#3A1E2E"/>' +
-        '<ellipse cx="26" cy="54" rx="3.3" ry="4.3" fill="#3A1E2E"/>' +
-        '<circle cx="15.2" cy="52.4" r="1.3" fill="#fff" opacity=".95"/>' +
-        '<circle cx="27.2" cy="52.4" r="1.3" fill="#fff" opacity=".95"/>' +
-        '<ellipse cx="10.6" cy="62" rx="3.4" ry="2.2" fill="#FFB3C4" opacity=".75"/>' +
-        '<ellipse cx="29.6" cy="62" rx="3.4" ry="2.2" fill="#FFB3C4" opacity=".75"/>' +
-        '<ellipse cx="20" cy="63.5" rx="2.4" ry="3" fill="#3A1E2E"/>' +
-        '<circle cx="12" cy="68.5" r="2.2" fill="#FFF6C8"/>' +
-        '</svg></div>';
+      el.innerHTML = '<div class="art"><img src="assets/weather/bus.svg" alt=""></div>';
     } else {
-      el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%">' +
-        // outline pass, then body pass: one clean white edge around the lobes
-        '<g fill="#fff">' +
-          '<circle cx="30" cy="50" r="22"/><circle cx="52" cy="41" r="26"/>' +
-          '<circle cx="72" cy="52" r="20"/><rect x="10" y="48" width="80" height="25" rx="12.5"/>' +
-        '</g>' +
-        '<g fill="url(#gRain)">' +
-          '<circle cx="30" cy="50" r="17.5"/><circle cx="52" cy="41" r="21.5"/>' +
-          '<circle cx="72" cy="52" r="15.5"/><rect x="15" y="49" width="70" height="19" rx="9.5"/>' +
-        '</g>' +
-        '<ellipse cx="45" cy="32" rx="16" ry="7" fill="#fff" opacity=".6"/>' +
-        '<ellipse cx="50" cy="64" rx="29" ry="6" fill="#8FA8CE" opacity=".3"/>' +
-        // a proper plush face: big glossy eyes, blush, a small grumpy mouth
-        '<ellipse cx="40" cy="48" rx="4.3" ry="5.4" fill="#463063"/>' +
-        '<ellipse cx="63" cy="48" rx="4.3" ry="5.4" fill="#463063"/>' +
-        '<circle cx="41.5" cy="46" r="1.6" fill="#fff" opacity=".92"/>' +
-        '<circle cx="64.5" cy="46" r="1.6" fill="#fff" opacity=".92"/>' +
-        '<ellipse cx="29" cy="55" rx="5.6" ry="3.3" fill="#FF9CC8" opacity=".55"/>' +
-        '<ellipse cx="74" cy="56" rx="5.6" ry="3.3" fill="#FF9CC8" opacity=".55"/>' +
-        '<path d="M46 59q5.5-4.5 11 0" stroke="#463063" stroke-width="3.2" fill="none" stroke-linecap="round"/>' +
-        // rounded teardrops instead of three hard dashes
-        '<g fill="url(#gDrop)" stroke="#fff" stroke-width="1.7" stroke-linejoin="round">' +
-          '<path d="M32 72c3.8 5.2 5.4 7.4 5.4 9.6a5.4 5.4 0 0 1-10.8 0c0-2.2 1.6-4.4 5.4-9.6z"/>' +
-          '<path d="M50 76c3.8 5.2 5.4 7.4 5.4 9.6a5.4 5.4 0 0 1-10.8 0c0-2.2 1.6-4.4 5.4-9.6z"/>' +
-          '<path d="M68 72c3.8 5.2 5.4 7.4 5.4 9.6a5.4 5.4 0 0 1-10.8 0c0-2.2 1.6-4.4 5.4-9.6z"/>' +
-        '</g>' +
-        // a highlight on each drop, the same trick as the eyes
-        '<g fill="#fff" opacity=".75">' +
-          '<ellipse cx="30.4" cy="79" rx="1.5" ry="2.1"/>' +
-          '<ellipse cx="48.4" cy="83" rx="1.5" ry="2.1"/>' +
-          '<ellipse cx="66.4" cy="79" rx="1.5" ry="2.1"/>' +
-        '</g>' +
-        '</svg></div>';
+      el.innerHTML = '<div class="art"><img src="assets/weather/rain.svg" alt=""></div>';
     }
 
     const f = {
@@ -2048,35 +1966,7 @@
     const bs = bossSize();
     bossEl.style.width = bs + 'px';
     bossEl.style.height = (bs * 0.72) + 'px';
-    bossEl.innerHTML = '<div class="bossArt"><svg viewBox="0 0 200 144" style="width:100%;height:100%">' +
-      // five lobes instead of one flat ellipse, built the same way as the small
-      // clouds: a white pass for the silhouette, then the body over it
-      '<g fill="#fff">' +
-        '<circle cx="48" cy="74" r="38"/><circle cx="92" cy="58" r="46"/>' +
-        '<circle cx="140" cy="66" r="40"/><circle cx="170" cy="82" r="29"/>' +
-        '<rect x="12" y="72" width="178" height="48" rx="24"/>' +
-      '</g>' +
-      '<g fill="url(#gBoss)">' +
-        '<circle cx="48" cy="74" r="31"/><circle cx="92" cy="58" r="39"/>' +
-        '<circle cx="140" cy="66" r="33"/><circle cx="170" cy="82" r="22"/>' +
-        '<rect x="19" y="73" width="164" height="39" rx="19.5"/>' +
-      '</g>' +
-      '<ellipse cx="80" cy="40" rx="30" ry="11" fill="#fff" opacity=".45"/>' +
-      '<ellipse cx="100" cy="104" rx="66" ry="11" fill="#5C639A" opacity=".3"/>' +
-      // a brow gives it the glare; the blush keeps it on the right side of cute
-      '<path d="M62 62l26 10M136 62l-26 10" stroke="#463063" stroke-width="7" stroke-linecap="round" opacity=".85"/>' +
-      '<ellipse cx="76" cy="84" rx="9" ry="10.5" fill="#463063"/>' +
-      '<ellipse cx="124" cy="84" rx="9" ry="10.5" fill="#463063"/>' +
-      '<circle cx="79" cy="80" r="3.2" fill="#fff" opacity=".9"/>' +
-      '<circle cx="127" cy="80" r="3.2" fill="#fff" opacity=".9"/>' +
-      '<ellipse cx="52" cy="95" rx="11" ry="6" fill="#FF9CC8" opacity=".45"/>' +
-      '<ellipse cx="150" cy="95" rx="11" ry="6" fill="#FF9CC8" opacity=".45"/>' +
-      '<path d="M82 106q18-13 36 0" stroke="#463063" stroke-width="6.5" fill="none" stroke-linecap="round"/>' +
-      // the bolt it is carrying, same warm gold as the little ones
-      '<ellipse cx="164" cy="34" rx="25" ry="23" fill="#FFD84D" opacity=".25"/>' +
-      '<path d="M172 4L149 41h15l-9 25 29-37h-16z" fill="url(#gGoldB)" stroke="#fff" ' +
-        'stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>' +
-      '</svg></div>';
+    bossEl.innerHTML = '<div class="bossArt"><img src="assets/weather/boss.svg" alt=""></div>';
     stage.appendChild(bossEl);
     waveEl.textContent = 'Big storm incoming!';
     waveEl.classList.remove('go'); void waveEl.offsetWidth; waveEl.classList.add('go');

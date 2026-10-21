@@ -71,9 +71,6 @@ body{
 .flower{position:absolute;bottom:2vh;width:14px;height:14px;border-radius:50%;background:#FFF;box-shadow:0 0 0 5px rgba(255,255,255,.35)}
 .flower::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--sun)}
 
-/* the shared gradient defs: present for paint-server lookups, never drawn */
-#artdefs{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
-
 #fx{position:absolute;inset:0;pointer-events:none;z-index:40}
 #world{position:absolute;inset:0;z-index:1;will-change:transform}
 /* the drifting sky lives on a leaf of its own so repainting it does not
@@ -106,6 +103,7 @@ body{
   transition:opacity .5s ease;
 }
 #boss .bossArt{width:100%;height:100%}
+#boss .bossArt img{width:100%;height:100%;display:block}
 #boss.charging .bossArt{animation:bossPulse .5s ease-in-out infinite}
 @keyframes bossPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
 /* a bubble landing on the big storm: brightness only, so it never fights
