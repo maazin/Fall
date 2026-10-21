@@ -257,6 +257,14 @@
   let mercyT = 0;               // seconds of grace after losing a heart
   const MERCY = 0.55;           // long enough to clear the cloud that just hit you
   let earT = 0;                 // Herbie's ears, recharging
+  /* The bus. Grandpa Herbie fell off a double-decker, his heart dropped, and
+     he has not seen a thing since. Every so often the bus comes falling out of
+     the sky, and if it lands on you, you get his blindness for a while: the
+     whole screen goes dark except the patch around you. When your sight comes
+     back, your heart comes back too, falling as a heart bubble, so catching it
+     is how you recover from whatever the dark cost you. */
+  const BUS_BLIND = 5.0;        // seconds in the dark, fade in and out included
+  let busBlindT = 0;
   const EAR_REST = 3.0;         // seconds before he can hear the next cloud
   const SHOT_GAP = 0.26;      // seconds between bubbles
   const SHOT_SPEED = 830;     // pixels a second, straight up
@@ -311,7 +319,8 @@
     purse:    [14, 30, 14, 30, 26], // a satisfying clatter of rhinestones
     pop:      [9, 30, 9],          // a cloud bursting, same shape as the gift tap
     bossWin:  [10, 55, 10, 55, 18],
-    gameOver: [24, 70, 16, 70, 9]  // fading away, not a long buzz
+    gameOver: [24, 70, 16, 70, 9], // fading away, not a long buzz
+    bus:      [26, 40, 18, 40, 30] // a crunch, then the lights going out
   };
   function buzz(pattern){
     if(!canVibrate || reduceMotion) return;
@@ -723,6 +732,27 @@
       thump(0, 58, 0.9, 0.16);
       blip(146.83, 0.05, 0.9, 0.075, { to: 174.61, type:'triangle', vib: 4, harm: 0 });
       duck(0.85, 0.7);
+    },
+    /* The bus. A cheerful two-tone honk as it appears, so you hear it coming
+       even before you spot it, and a crunch and a falling honk if it lands. */
+    busHonk(){
+      blip(392.00, 0,    0.16, 0.07, { type:'triangle', harm: 0 });
+      blip(329.63, 0.17, 0.20, 0.07, { type:'triangle', harm: 0 });
+    },
+    busCrash(x){
+      const p = panFor(x);
+      thump(0, 52, 0.55, 0.20);
+      puff(0, 0.40, 0.20, 1600, 160, p);
+      blip(392.00, 0.04, 0.22, 0.10, { type:'triangle', harm: 0, pan: p });
+      blip(261.63, 0.20, 0.55, 0.09, { to: 130.81, bend: 0.85, type:'triangle', vib: 7, harm: 0, pan: p });
+      duck(1, 0.6);
+    },
+    // sight back, and a heart on its way down to you
+    heartBack(){
+      [659.25, 830.61, 987.77, 1318.51].forEach(function(f, i){
+        blip(f, i * 0.07, 0.30, 0.09, { vib: 5 });
+      });
+      puff(0.05, 0.4, 0.05, 1200, 4200);
     },
     // power-up / shield: a rising sparkle
     shield(x){
@@ -1445,7 +1475,7 @@
     runCaught = {};
     if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
     app.scrollLeft = 0; app.scrollTop = 0;    // belt and braces where overflow:clip is missing
-    blindOn = !!perk.blind; lastBlindX = -999; earT = 0;
+    blindOn = !!perk.blind; lastBlindX = -999; earT = 0; busBlindT = 0;
     sizeBlind();
     blindEl.classList.toggle('on', blindOn);
     app.classList.toggle('night', !!perk.night);
@@ -1558,7 +1588,7 @@
       if(!f || f.dead) continue;
       const fx = f.x, fy = f.y;
 
-      if(f.kind === 'rain' || f.kind === 'bolt' || f.kind === 'mimic'){
+      if(f.kind === 'rain' || f.kind === 'bolt' || f.kind === 'mimic' || f.kind === 'bus'){
         zapped++;
         burst(fx, fy, ['#FF8CE6','#FFD9F5','#FFF'], 12);
       } else if(f.kind === 'friend') {
@@ -1703,6 +1733,33 @@
     }
   }
 
+  /* Herbie's blindness, lent to whoever the bus landed on. It is the same
+     overlay he plays with permanently: dark everywhere except the patch of sky
+     around you, which follows you as you move. */
+  function busBlind(){
+    busBlindT = BUS_BLIND;
+    blindOn = true;
+    lastBlindX = -999;            // force the pocket onto you right now
+    sizeBlind();
+    blindEl.classList.add('on');
+    if(player) placePlayer();
+  }
+  function stepBusBlind(dt){
+    if(busBlindT <= 0) return;
+    busBlindT = Math.max(0, busBlindT - dt);
+    if(busBlindT > 0) return;
+    // Herbie was blind before the bus ever came; it does not give him his sight
+    if(!perk.blind){
+      blindOn = false;
+      blindEl.classList.remove('on');
+    }
+    // and now your heart comes back down, straight above you, so it is catchable
+    const s = fallerSize();
+    spawnAt('pheart', Math.max(s / 2, Math.min(W - s / 2, px)), s);
+    floatText('your heart! \u2764\uFE0F', px, H * 0.32, 'star');
+    sfx.heartBack();
+  }
+
   function sizeBlind(){
     blindEl.style.setProperty('--brx', Math.round(Math.max(150, W * 0.30)) + 'px');
     blindEl.style.setProperty('--bry', Math.round(Math.max(290, H * 0.40)) + 'px');
@@ -1724,6 +1781,12 @@
     // perks was making them shorter and specialised, not making them scarce
     const pwC = (elapsed > 9 ? 0.050 : 0) * (perk.pwLuck || 1);
 
+    /* The bus is rare and never piles up: none for the first fifteen seconds
+       (or Pineapple's grace, if longer), never two in the sky at once, and
+       never while a bus has already put you in the dark. Roughly one a round. */
+    const busOut = fallers.some(function(f){ return f.kind === 'bus'; });
+    const busC = (elapsed > Math.max(15, perk.grace || 0) && !busOut && busBlindT <= 0) ? 0.032 : 0;
+
     // ME sneaks in dressed as somebody's friend
     // ME is the only buddy her mimics show up for: for everyone else the
     // feature is switched off entirely
@@ -1734,8 +1797,17 @@
     if(r < starC) kind = 'star';
     else if(r < starC + boltC) kind = 'bolt';
     else if(r < starC + boltC + rainC) kind = 'rain';
-    else if(r < starC + boltC + rainC + pwC) kind = pickPowerUp();
-    else if(r < starC + boltC + rainC + pwC + mimicC) kind = 'mimic';
+    else if(r < starC + boltC + rainC + busC) kind = 'bus';
+    else if(r < starC + boltC + rainC + busC + pwC) kind = pickPowerUp();
+    else if(r < starC + boltC + rainC + busC + pwC + mimicC) kind = 'mimic';
+
+    if(kind === 'bus'){
+      // a bus is a big thing, so it gets a bigger box and is kept off the edges
+      const bs = s * 1.55;
+      spawnAt('bus', bs/2 + Math.random() * Math.max(1, W - bs), bs);
+      sfx.busHonk();
+      return;
+    }
 
     const atX = s/2 + Math.random() * Math.max(1, W - s);
     if(kind === 'bolt') telegraphBolt(atX, s); else spawnAt(kind, atX, s);
@@ -1864,6 +1936,39 @@
           'stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round"/>' +
         '<circle cx="45" cy="70" r="2" fill="#FFF8D8" opacity=".85"/>' +
         '</svg></div>';
+    } else if(kind === 'bus'){
+      el.classList.add('bus');
+      el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%">' +
+        // wheels first, so the body sits over their tops
+        '<g fill="#3D3352"><circle cx="24" cy="76" r="9"/><circle cx="77" cy="76" r="9"/></g>' +
+        '<g fill="#C9CCE0"><circle cx="24" cy="76" r="3.6"/><circle cx="77" cy="76" r="3.6"/></g>' +
+        // outline pass, then the body: the same single clean edge the clouds get
+        '<rect x="2" y="13" width="96" height="65" rx="15" fill="#fff"/>' +
+        '<rect x="6" y="17" width="88" height="57" rx="11.5" fill="url(#gBus)"/>' +
+        // the cream band between the decks is what makes it read as a London bus
+        '<rect x="6" y="39.5" width="88" height="4.6" fill="#FFF1D2"/>' +
+        // upper deck runs the whole length, over the cab; lower deck behind it
+        '<g fill="url(#gBusWin)">' +
+          '<rect x="11" y="23" width="17" height="13" rx="3.6"/><rect x="31" y="23" width="17" height="13" rx="3.6"/>' +
+          '<rect x="51" y="23" width="17" height="13" rx="3.6"/><rect x="71" y="23" width="17" height="13" rx="3.6"/>' +
+          '<rect x="35" y="48" width="16" height="13" rx="3.6"/><rect x="54" y="48" width="16" height="13" rx="3.6"/>' +
+          '<rect x="73" y="48" width="15" height="13" rx="3.6"/>' +
+        '</g>' +
+        '<path d="M14.5 33.5l5-7M34.5 33.5l5-7M54.5 33.5l5-7M74.5 33.5l5-7M38.5 58.5l5-7M57.5 58.5l5-7M76 58.5l5-7" ' +
+          'stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".8"/>' +
+        // a thin gold line along the skirt
+        '<rect x="34" y="65" width="56" height="2" rx="1" fill="#FFD27A" opacity=".85"/>' +
+        '<ellipse cx="44" cy="20.5" rx="28" ry="2.6" fill="#fff" opacity=".35"/>' +
+        // the cab is its face, and it is falling, so it looks alarmed about it
+        '<ellipse cx="14" cy="54" rx="3.3" ry="4.3" fill="#3A1E2E"/>' +
+        '<ellipse cx="26" cy="54" rx="3.3" ry="4.3" fill="#3A1E2E"/>' +
+        '<circle cx="15.2" cy="52.4" r="1.3" fill="#fff" opacity=".95"/>' +
+        '<circle cx="27.2" cy="52.4" r="1.3" fill="#fff" opacity=".95"/>' +
+        '<ellipse cx="10.6" cy="62" rx="3.4" ry="2.2" fill="#FFB3C4" opacity=".75"/>' +
+        '<ellipse cx="29.6" cy="62" rx="3.4" ry="2.2" fill="#FFB3C4" opacity=".75"/>' +
+        '<ellipse cx="20" cy="63.5" rx="2.4" ry="3" fill="#3A1E2E"/>' +
+        '<circle cx="12" cy="68.5" r="2.2" fill="#FFF6C8"/>' +
+        '</svg></div>';
     } else {
       el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%">' +
         // outline pass, then body pass: one clean white edge around the lobes
@@ -1909,9 +2014,11 @@
       vy: (118 + 252 * d + Math.random() * (40 + 40 * d)) * heightScale()
           * (kind === 'bolt' ? 1.46 * (perk.bolt || 1) : 1)
           * (kind === 'rain' ? (perk.rainFall || 1) : 1)
+          // a bus is heavy but dramatic: slow enough that you see it coming
+          * (kind === 'bus' ? 0.78 : 1)
           * (isGift(kind) ? 0.72 : 1)
           * (perk.fall || 1),
-      sway: (Math.random() * 2 - 1) * (kind === 'bolt' ? 10 : kind === 'mimic' ? 34 + 26 * d : 20 + 26 * d),
+      sway: (Math.random() * 2 - 1) * (kind === 'bolt' ? 10 : kind === 'bus' ? 8 : kind === 'mimic' ? 34 + 26 * d : 20 + 26 * d),
       webbed: 0,
       veered: 0,
       phase: Math.random() * 6.28,
@@ -2202,7 +2309,7 @@
       return;
     }
 
-    if(f.kind === 'bolt' || f.kind === 'rain'){
+    if(f.kind === 'bolt' || f.kind === 'rain' || f.kind === 'bus'){
       if(shield > 0){
         shield--;
         if(shield > 0){
@@ -2245,6 +2352,24 @@
       shake(0.62); freeze(0.085); buzz(HAPTIC.zap);
       sfx.zap(cx);
       if(hearts === 0) finish();
+      return;
+    }
+
+    /* Hit by the bus. It does not take a heart: the dark is the cost, because
+       everything else keeps falling while you cannot see it. Your streak goes
+       the way it would for any hit, and you get the usual moment of grace so
+       you are not blinded and then immediately rained on before you can move. */
+    if(f.kind === 'bus'){
+      if(bossState === 'fight' || bossState === 'enter') bossHurt = true;
+      combo = Math.floor(combo / 3); comboT = combo > 0 ? comboWindow() : 0; drawCombo();
+      mercyT = MERCY;
+      player.classList.add('mercy');
+      player.classList.remove('ouch'); void player.offsetWidth; player.classList.add('ouch');
+      floatText('BUS! \uD83D\uDE8C', cx, cy, 'bad');
+      burst(cx, cy, ['#E8423A','#FF8A80','#FFF1D2','#3D3352','#FFF'], 26);
+      shake(0.75); freeze(0.11); buzz(HAPTIC.bus);
+      sfx.busCrash(cx);
+      busBlind();
       return;
     }
 
@@ -2512,6 +2637,7 @@
     placePlayer();
     stepShake(realDt);
     stepWarns(dt);
+    stepBusBlind(dt);
 
     // motion trail
     if(!reduceMotion){
@@ -2632,10 +2758,10 @@
 
       const ddx = (f.x + wob) - pcx;
       const ddy = f.y - pcy;
-      const rr = (f.size + ps) * 0.40 * (perk.reach || 1) * touchReach();
+      const rr = (f.size + ps) * (f.kind === 'bus' ? 0.34 : 0.40) * (perk.reach || 1) * touchReach();
 
       // near miss on a hazard: skill reward for cutting it fine
-      if(!f.near && (f.kind === 'rain' || f.kind === 'bolt')){
+      if(!f.near && (f.kind === 'rain' || f.kind === 'bolt' || f.kind === 'bus')){
         const nr = rr * 1.6;
         if(ddx*ddx + ddy*ddy < nr*nr && ddx*ddx + ddy*ddy >= rr*rr && f.y > pcy - ps){
           f.near = true;
@@ -2649,7 +2775,7 @@
       if(ddx*ddx + ddy*ddy < rr*rr){
         // just been hit: clouds pass through for a moment so two in a row
         // cannot take two hearts before there is any chance to move
-        if(mercyT > 0 && (f.kind === 'rain' || f.kind === 'bolt') && !(f.kind === 'bolt' && perk.boltImmune)) continue;
+        if(mercyT > 0 && (f.kind === 'rain' || f.kind === 'bolt' || f.kind === 'bus') && !(f.kind === 'bolt' && perk.boltImmune)) continue;
         f.x = f.x + wob;
         hit(f);
         const j = fallers.indexOf(f);
@@ -2769,6 +2895,7 @@
     if(bossEl){ bossEl.remove(); bossEl = null; }
     bossState = 'none';
     blindOn = false;
+    busBlindT = 0;
     blindEl.classList.remove('on');
     app.classList.remove('night');
     resetSky();

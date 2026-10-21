@@ -376,6 +376,13 @@ body.noflash #flash{display:none}
 
 /* the cloud carries its own halo in the artwork now, so this only has to add
    a little bloom on top rather than fake the whole glow */
+/* The bus tumbles rather than wobbles: a slow rock, heavy, like something
+   that has no business being in the sky and knows it. */
+.faller.bus .art{animation:busTumble 2.4s ease-in-out infinite,dropIn .28s cubic-bezier(.2,1.5,.4,1)}
+@keyframes busTumble{
+  0%,100%{transform:rotate(-11deg)}
+  50%{transform:rotate(9deg) translateY(3px)}
+}
 .faller.bolt .art{animation-duration:.5s;filter:drop-shadow(0 0 9px rgba(255,216,77,.8))}
 
 /* Cheryl's web: a caught-on-the-ground friend still waiting to be collected */
@@ -894,7 +901,7 @@ h2{
 @media (prefers-reduced-motion:reduce){
   .warn{animation:none}
   .cloud,.faller .art,#overBuddy,#timePill.low,#flash.zap,.ring,#shieldRing,
-  .faller.mimic .art::before,.faller.purse::after,.pw.ending,
+  .faller.mimic .art::before,.faller.purse::after,.pw.ending,.faller.bus .art,
   #comboPill.beat,#scoreVal.bump,#boss.charging .bossArt{animation:none !important}
   .card{animation:none}
   #world{will-change:auto}

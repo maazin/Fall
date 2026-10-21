@@ -44,6 +44,29 @@ the global board — the page just shows the local best-runs list.
 
 The rules live on the **How to play** screen, reachable from the title.
 
+## Herbie's bus
+
+Grandpa Herbie fell off a double-decker bus, his heart dropped, and he has not
+seen a thing since. That bus now falls out of the sky, roughly once a round.
+
+If it lands on you, you get his blindness for five seconds: the whole screen
+goes dark except the patch around you, the same overlay Herbie plays with all
+the time. It does not take a heart. The dark is the cost, because rain and
+lightning keep falling while you cannot see them. When your sight comes back,
+your heart comes back too, falling as a heart bubble right above you, so
+catching it is how you recover from whatever the dark cost you.
+
+- a shield blocks it, like any other hazard
+- the purse clears it off the screen
+- it never comes before fifteen seconds (or Pineapple's grace, if longer), never
+  two at once, and never while a bus already has you in the dark
+- it gives you the usual moment of grace, so you are not blinded and then
+  rained on before you can move
+- Herbie is blind before the bus ever comes; when its timer runs out he stays
+  blind, though his heart still falls
+
+`BUS_BLIND` in `src/game.js` is the length of the dark.
+
 ## Offline
 
 `sw.js` precaches the page, the stylesheet, the script and all nineteen buddies,
