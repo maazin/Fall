@@ -364,6 +364,7 @@
   let paused = false;
   let perk = NO_PERK, maxHearts = 3, shield = 0, shieldCap = 1, shieldEl = null;
   let lastPx = 0, trailT = 0;
+  const RAINBOW = ['#FF5A7A', '#FF9F43', '#FFD84D', '#6FE08A', '#5CC8FF', '#A98BFF'];
   /* game feel: a trauma value that decays, squared into a shake, and a few
      frames of near-frozen time on the big moments. Both are the cheap half of
      what makes an arcade game feel like one. */
@@ -2826,7 +2827,37 @@
     if(!reduceMotion){
       const vel = Math.abs(px - lastPx) / Math.max(dt, 0.001);
       trailT -= dt;
-      if(vel > (perk.trail ? 130 : 340) && trailT <= 0){
+      if(perk.trail){
+        /* Mooni's rainbow blur: a column of six colour bands left behind her
+           every few milliseconds, so at speed they run together into a
+           rainbow streak. Brighter while she is dashing, which is exactly
+           when her catches pay extra, so the colour tells you it is on. */
+        if(vel > 130){
+          const ps = playerSize();
+          const top = groundY - ps * 0.86;
+          const band = ps * 0.72 / RAINBOW.length;
+          const a = dashing() ? 0.78 : 0.48;
+          /* Fill in the whole stretch she covered this frame, not just the
+             spot she left, or at full speed the trail breaks up into
+             separate stripes. Capped so a slow frame cannot flood it. */
+          const dist = px - lastPx;
+          const steps = Math.min(8, Math.max(1, Math.ceil(Math.abs(dist) / (band * 1.4))));
+          // laid down from her back edge, so the streak trails her instead of
+          // being painted over her (the effects canvas sits above the buddies)
+          const back = -Math.sign(dist) * ps * 0.34;
+          for(let j = 0; j < steps; j++){
+            const x = lastPx + dist * (j / steps) + back;
+            for(let k = 0; k < RAINBOW.length; k++){
+              particles.push({
+                x: x, y: top + band * (k + 0.5),
+                vx: 0, vy: 0, g: 0, a: a,
+                r: band * 0.8, life: 0.4, age: 0,
+                c: RAINBOW[k], spin: 0, shape: 'blob'
+              });
+            }
+          }
+        }
+      } else if(vel > 340 && trailT <= 0){
         trailT = 0.035;
         particles.push({
           x: lastPx, y: groundY - playerSize()/2 + 12,
@@ -3025,7 +3056,14 @@
       ctx.save();
       ctx.globalAlpha = k * (p.a === undefined ? 1 : p.a);
       ctx.translate(p.x, p.y);
-      if(p.shape === 'spark'){
+      if(p.shape === 'blob'){
+        // a soft stretched dot that shrinks as it fades: the rainbow trail
+        const r = p.r * (0.55 + 0.45 * k);
+        ctx.fillStyle = p.c;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 1.7, r, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if(p.shape === 'spark'){
         // additive, so overlapping twinkles bloom rather than muddy
         ctx.globalCompositeOperation = 'lighter';
         ctx.rotate(p.spin + p.age * 3.4);
