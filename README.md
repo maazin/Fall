@@ -114,13 +114,13 @@ bend the game most at the bottom.
 
 | Tier | Price each | Buddies |
 | --- | --- | --- |
-| 1 Starters | choose 1 free, 15 for the others | Omar, Sophie, Pep |
-| 2 Squishlings | 25 | Lazy Harp Seal, Butt Nugget, Grandpa Herbie |
-| 3 Sprouts | 35 | Pip, Cheryl, Prissy |
-| 4 Snugglers | 50 | Harmony, Connor, Carrie |
-| 5 Champions | 65 | Pineapple, Mel, Blueberry Cow |
-| 6 Legends | 80 | Bessie, Mamu, Ronnie (his milk comes with him) |
-| 7 Mythic | 100 | Mooni, ME (Devin comes with her), Poppy |
+| 1 Starters | choose 1 free, 40 for the others | Omar, Sophie, Pep |
+| 2 Squishlings | 60 | Lazy Harp Seal, Butt Nugget, Grandpa Herbie |
+| 3 Sprouts | 90 | Pip, Cheryl, Prissy |
+| 4 Snugglers | 130 | Harmony, Connor, Carrie |
+| 5 Champions | 180 | Pineapple, Mel, Blueberry Cow |
+| 6 Legends | 240 | Bessie, Mamu, Ronnie (his milk comes with him) |
+| 7 Mythic | 320 | Mooni, ME (Devin comes with her), Poppy |
 
 Every tier after the starters holds three buddies, the same as the starters.
 
@@ -129,8 +129,9 @@ The only way to earn mallows is to catch them: they float down during a run
 one does not touch your score or streak. Nothing is paid out for points or
 badges. A decent minute-long run catches three to five.
 
-That puts the second starter about four runs away, so the first unlock comes
-early, and then the prices climb: reaching Mythic means owning two buddies in
+That puts the second starter around ten runs away, and well out of reach of
+any single run, however long: a great three-minute run catches a dozen or so.
+After that the prices climb: reaching Mythic means owning two buddies in
 every tier below it, which is a long-term goal. Every run still drops some
 mallows, so the loop always pays, but you have to go and get them.
 
