@@ -7,7 +7,7 @@
  *
  * The per-buddy sets are the only source of truth. The main board is not
  * stored at all: it is the average of a player's best with each of the
- * nineteen characters, divided by the whole roster rather than by however
+ * characters on the roster, divided by the whole roster rather than by however
  * many they happen to have tried, so it answers "who is good with the whole
  * squad" rather than "who had one lucky run".
  *
@@ -106,7 +106,7 @@ const ROSTER = [
   'mooni', 'omar', 'mamu', 'pineapple', 'blueberry-cow', 'bessie', 'mel',
   'cheryl', 'ronnie', 'connor', 'lazy-harp-seal', 'me', 'devin',
   'grandpa-herbie', 'sophie', 'carrie', 'butt-nugget', 'pip', 'pep',
-  'ronnie-s-milk'
+  'ronnie-s-milk', 'poppy', 'prissy', 'harmony'
 ];
 
 function slugify(name) {

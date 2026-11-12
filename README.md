@@ -200,7 +200,7 @@ stopped being a max and started being a mean. The old `fall:best` key is left
 alone and simply no longer read.
 
 `ROSTER` in `api/scores.mjs` is the divisor and **must be kept in step with
-`CHARS` in `src/game.js`** (twenty characters as of Ronnie's Milk). A character missing from it still gets its own
+`CHARS` in `src/game.js`** (twenty-three characters as of Poppy, Prissy and Harmony). A character missing from it still gets its own
 per-buddy board but contributes nothing to the main one.
 
 Picking a single buddy from the dropdown still shows plain best runs for that

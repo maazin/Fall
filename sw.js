@@ -32,7 +32,7 @@
  * changes no longer need a bump to reach players; they come fresh regardless.
  */
 
-const VERSION = 'fall-v6';
+const VERSION = 'fall-v7';
 const CORE = VERSION + '-core';
 const RUNTIME = VERSION + '-runtime';
 
@@ -43,7 +43,7 @@ const BUDDIES = [
   'mooni', 'omar', 'mamu', 'pineapple', 'blueberry-cow', 'bessie', 'mel',
   'cheryl', 'ronnie', 'connor', 'lazy-harp-seal', 'me', 'devin',
   'grandpa-herbie', 'sophie', 'carrie', 'butt-nugget', 'pip', 'pep',
-  'ronnies-milk'
+  'ronnies-milk', 'poppy', 'prissy', 'harmony'
 ].map(function (n) { return 'assets/buddies/' + n + '.webp'; });
 
 // the weather sprites carry their own colours, so each one is a whole file

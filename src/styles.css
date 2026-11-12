@@ -156,6 +156,8 @@ body{
 /* the pill leans on the colour of the tier you are on */
 #comboPill[data-m="3"]{background:linear-gradient(135deg,#B48CFF,#8C6BFF);box-shadow:0 5px 0 #5B41C4}
 #comboPill[data-m="4"]{background:linear-gradient(135deg,#FFD96B,#FF9F1C);box-shadow:0 5px 0 #C9700A}
+/* x5 only exists for Poppy, so it gets her colour */
+#comboPill[data-m="5"]{background:linear-gradient(135deg,#FFB3D9,#FF4F9A);box-shadow:0 5px 0 #C22F72}
 #comboPill.beat,#comboPill.pop.beat{animation:comboBeat .22s cubic-bezier(.2,1.7,.4,1)}
 @keyframes comboBeat{0%{transform:scale(1)}45%{transform:scale(1.13)}100%{transform:scale(1)}}
 

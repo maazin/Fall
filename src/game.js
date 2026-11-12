@@ -27,7 +27,10 @@
        bests are keyed by position in this array, so inserting anywhere but the
        end would silently re-label everybody's saved records. He lives behind
        Ronnie's tile instead, which is where you find him anyway. */
-    { name: "Ronnie's Milk", src: 'assets/buddies/ronnies-milk.webp' }
+    { name: "Ronnie's Milk", src: 'assets/buddies/ronnies-milk.webp' },
+    { name: 'Poppy', src: 'assets/buddies/poppy.webp' },
+    { name: 'Prissy', src: 'assets/buddies/prissy.webp' },
+    { name: 'Harmony', src: 'assets/buddies/harmony.webp' }
   ];
 
   /* ---------------- buddy perks ----------------
@@ -117,7 +120,19 @@
 
     "Ronnie's Milk":  { t:'Cream of the Crop', d:'Ronnie comes running, and pays',
                         pairOnly:1, pairPay:4, heartLuck:1.6,
-                        long:'A carton of milk is no good on its own, so it calls Ronnie and nobody else: every single friend that falls is him, and each one pays 4 on top of your streak. Playing the milk is the only way to see him fall at all, the same way he is the only one who ever sees a carton. Hazards and bubbles are unchanged, so the sky still has everything in it except other squishmallows.' }
+                        long:'A carton of milk is no good on its own, so it calls Ronnie and nobody else: every single friend that falls is him, and each one pays 4 on top of your streak. Playing the milk is the only way to see him fall at all, the same way he is the only one who ever sees a carton. Hazards and bubbles are unchanged, so the sky still has everything in it except other squishmallows.' },
+
+    'Poppy':          { t:'When Pigs Fly',  d:'A fifth multiplier, x5 at 30',
+                        top:30,
+                        long:'Everybody else tops out at x4. Poppy has wings, so her streak keeps climbing: hold it to 30 catches and every catch pays x5. It is the highest multiplier in the game, but nothing about getting there is easier, so it only pays off if you can keep a streak alive through the storm.' },
+
+    'Prissy':         { t:'Centre Stage',   d:'Dead-centre catches pay 2 extra',
+                        centre:2,
+                        long:'A peacock likes to be looked at. Catch a friend or a star right in the middle of her, rather than on the edge of her reach, and it pays 2 extra on top of everything else, with a little fan of sparkle to show it. Sloppy catches still count; they just do not get the bonus.' },
+
+    'Harmony':        { t:'Owl Eyes',       d:'Sees where clouds will land',
+                        shadows:1, busProof:1,
+                        long:'An owl sees everything. Every rain cloud, lightning cloud and bus throws a shadow on the ground beneath it that darkens as it gets closer, so you always know where the trouble is going to land. She sees in the dark too, so Herbie\u2019s bus can still knock her streak down but it cannot blind her.' }
   };
 
   const NO_PERK = { t:'Squishy', d:'A good all-rounder' };
@@ -277,6 +292,8 @@
   let comboT = 0;
   function multiplier(){
     const t = perk.tiers || [5, 12, 20];
+    // Poppy's wings: one tier past everybody else's ceiling
+    if(perk.top && combo >= perk.top) return 5;
     return combo >= t[2] ? 4 : combo >= t[1] ? 3 : combo >= t[0] ? 2 : 1;
   }
 
@@ -2259,7 +2276,10 @@
       burst(cx, cy, ['#E8423A','#FF8A80','#FFF1D2','#3D3352','#FFF'], 26);
       shake(0.75); freeze(0.11); buzz(HAPTIC.bus);
       sfx.busCrash(cx);
-      busBlind();
+      // Harmony sees in the dark: the crash still costs her the streak, but
+      // there is no blindness, and so no heart floating back down after it
+      if(perk.busProof) floatText('I can see! \uD83E\uDD89', cx, cy - 40, 'star');
+      else busBlind();
       return;
     }
 
@@ -2290,7 +2310,7 @@
     const m = tier * (pwActive('x2') ? 2 : 1);
 
     if(f.kind === 'star'){
-      const sv = (perk.star || 5) * m;
+      const sv = (perk.star || 5) * m + centrePay(f);
       score += sv;
       floatText('+' + sv, cx, cy, 'star');
       burst(cx, cy, ['#FFC53C','#FFE9A8','#FFF','#FF4F9A'], 26, 'spark');
@@ -2301,7 +2321,7 @@
       // a friend rescued off the ground out of Cheryl's web is worth extra
       const webSave = (f.webbed && perk.webTime) ? 1 : 0;
       const mateBonus = (perk.pairPay && f.ci === swapPartner(picked)) ? perk.pairPay : 0;
-      const fv = m + (perk.friendBonus || 0) + webSave + mateBonus;
+      const fv = m + (perk.friendBonus || 0) + webSave + mateBonus + centrePay(f);
       score += fv;
       floatText(m > 1 ? '+' + fv + '  x' + m : '+' + fv, cx, cy);
       burst(cx, cy, ['#FF4F9A','#2FCBBD','#FFC53C','#8C6BFF','#FFF'], 16);
@@ -2311,6 +2331,16 @@
     setScore();
     drawCombo();
     pulseCombo();
+  }
+
+  /* Prissy's bonus for a catch landed in the middle of her rather than on the
+     edge of her reach. The catch loop marks the faller with how far off centre
+     it was, as a fraction of the reach, just before it calls hit(). */
+  function centrePay(f){
+    if(!perk.centre || !(f.off < 0.32)) return 0;
+    floatText('perfect!', f.x, f.y - 46, 'close');
+    burst(f.x, f.y, ['#2F7BEA','#7FD8F0','#FFD84D','#FFF'], 12, 'spark');
+    return perk.centre;
   }
 
   /* ---------------- blaster ----------------
@@ -2666,6 +2696,7 @@
         // just been hit: clouds pass through for a moment so two in a row
         // cannot take two hearts before there is any chance to move
         if(mercyT > 0 && (f.kind === 'rain' || f.kind === 'bolt' || f.kind === 'bus') && !(f.kind === 'bolt' && perk.boltImmune)) continue;
+        f.off = Math.abs(ddx) / rr;
         f.x = f.x + wob;
         hit(f);
         const j = fallers.indexOf(f);
@@ -2711,6 +2742,7 @@
 
   function stepParticles(dt){
     ctx.clearRect(0,0,W,H);
+    if(perk.shadows && running) drawShadows();
     // air drag, so a burst flares out and settles instead of flying flat away
     const drag = Math.pow(0.12, dt);
     let sparks = 0;
@@ -2751,6 +2783,26 @@
       ctx.restore();
     }
     if(sparks) ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /* Harmony's owl eyes: a shadow on the ground under every hazard, faint
+     while it is high up and darker and tighter as it comes down, so the
+     landing spot is readable long before the cloud is. */
+  function drawShadows(){
+    for(let i = 0; i < fallers.length; i++){
+      const f = fallers[i];
+      if(f.kind !== 'rain' && f.kind !== 'bolt' && f.kind !== 'bus') continue;
+      if(f.y > groundY) continue;
+      const k = Math.max(0, Math.min(1, f.y / groundY));
+      const rx = f.size * (0.62 - 0.22 * k);
+      ctx.save();
+      ctx.globalAlpha = 0.10 + 0.42 * k * k;
+      ctx.fillStyle = f.kind === 'bolt' ? '#5A4A00' : f.kind === 'bus' ? '#5A1410' : '#1F2A3A';
+      ctx.beginPath();
+      ctx.ellipse(f.x, groundY - 4, rx, rx * 0.22, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   function confetti(){
