@@ -1,6 +1,25 @@
 (function(){
   "use strict";
 
+  /* ---------------- save version ----------------
+     Bumping SAVE_VERSION starts every phone over: squad book, badges, bests,
+     saved runs, mallows and unlocks are cleared the first time the new
+     version loads. Settings and your board name are kept. Version 2 is the
+     relaunch with starters and tiers, where everybody begins from nothing. */
+  const SAVE_VERSION = '2';
+  const KEEP_KEYS = ['squishMuted', 'squishNoFlash', 'squishDiff', 'squishPlayer', 'squishSave'];
+  try{
+    if(localStorage.getItem('squishSave') !== SAVE_VERSION){
+      const doomed = [];
+      for(let k = 0; k < localStorage.length; k++){
+        const key = localStorage.key(k);
+        if(key && key.indexOf('squish') === 0 && KEEP_KEYS.indexOf(key) < 0) doomed.push(key);
+      }
+      doomed.forEach(function(key){ localStorage.removeItem(key); });
+      localStorage.setItem('squishSave', SAVE_VERSION);
+    }
+  }catch(e){}
+
   /* The roster. Add a buddy by dropping a .webp in assets/buddies and
      listing it here; order matters, the picker shows them in this order. */
   const CHARS = [
@@ -42,9 +61,9 @@
   /* Every buddy gets its own VERB, not the same number with a new label.
      No two of these touch the same system. */
   const PERKS = {
-    'Mooni':          { t:'Berry Dash',     d:'Far faster, glued to your finger',
-                        speed:1.55, snap:2.1, trail:1,
-                        long:'She moves 55% faster on the keyboard and tracks your finger or mouse more than twice as tightly as anyone else, so she goes exactly where you point instead of drifting there. She leaves a rainbow blur when she really gets going.' },
+    'Mooni':          { t:'Rainbow Rush',   d:'Dash catches pay +2, dash through rain',
+                        speed:1.7, snap:2.4, trail:1, dashPay:2, dashDodge:1,
+                        long:'The fastest thing in the sky. She moves 70% faster on the keyboard and tracks your finger more than twice as tightly as anyone else. Whenever she is dashing, every friend or star she catches pays 2 extra, and rain clouds cannot touch her at all: she rushes straight through them in a rainbow blur. Stand still and she is as easy to hit as anybody, so the trick is to never stop moving.' },
 
     'Omar':           { t:'Bear Hug',       d:'Every friend pays 1 extra',
                         friendBonus:1,
@@ -176,58 +195,75 @@
     .filter(function(i){ return TWIN_IDS.indexOf(i) < 0 && PRIVATE_IDS.indexOf(i) < 0; });
   function perkOf(i){ return PERKS[CHARS[i].name] || NO_PERK; }
 
-  /* ---------------- unlocks and mallows ----------------
-     The picker runs weakest to strongest, so the buddies that bend the game
-     most sit at the bottom and cost the most to bring home. The first eight
-     are free. A pair's second half comes with the first: unlock ME and Devin
-     is behind her tile, unlock Ronnie and his milk comes too.
+  /* ---------------- starters, tiers and mallows ----------------
+     You start by choosing one of three starters, and everybody else is
+     locked. The rest are bought with mallows, tier by tier: a tier only opens
+     once you own TIER_GATE buddies from the one below it, so there is no
+     saving up and jumping straight to Poppy. The picker runs tier by tier,
+     weakest at the top, the ones that bend the game most at the bottom.
+
+     A pair's second half comes with the first: unlock ME and Devin is behind
+     her tile, unlock Ronnie and his milk comes too.
 
      Mallows are the currency: little marshmallows that float down during a
-     run, plus one for every MALLOW_PER_POINTS points you finish on and a
-     handful for every new badge. They live on this phone only, like the
-     squad book.
+     run, and the only way to get them is to catch them. Nothing is handed
+     out for points or badges, so a run that pays is a run where you went and
+     got them. A few fall every run, enough that the second starter is a handful
+     of runs away and Mythic is a long road. They live on this phone only, like
+     the squad book.
 
-     Anybody missing from PRICE is free, so a new buddy is playable on day one
-     until someone decides what it should cost. Anybody missing from
-     PICK_ORDER goes on the end of the picker. */
-  const PICK_ORDER = [
-    'Grandpa Herbie', 'Lazy Harp Seal', 'Butt Nugget', 'Sophie', 'Pip', 'Cheryl', 'Pep', 'Omar',
-    'Prissy', 'Harmony', 'Connor', 'Carrie', 'Pineapple', 'Mel', 'Blueberry Cow', 'Bessie',
-    'Mooni', 'Mamu', 'Ronnie', 'ME', 'Poppy'
+     Anybody missing from TIERS goes in the last tier at its price, so a new
+     buddy always has a home until someone decides where it belongs. */
+  const TIERS = [
+    { name: 'Starters',    price: 15,  buddies: ['Omar', 'Sophie', 'Pep'] },
+    { name: 'Squishlings', price: 25,  buddies: ['Lazy Harp Seal', 'Butt Nugget', 'Grandpa Herbie'] },
+    { name: 'Sprouts',     price: 35,  buddies: ['Pip', 'Cheryl', 'Prissy'] },
+    { name: 'Snugglers',   price: 50,  buddies: ['Harmony', 'Connor', 'Carrie'] },
+    { name: 'Champions',   price: 65,  buddies: ['Pineapple', 'Mel', 'Blueberry Cow'] },
+    { name: 'Legends',     price: 80,  buddies: ['Bessie', 'Mamu', 'Ronnie'] },
+    { name: 'Mythic',      price: 100, buddies: ['Mooni', 'ME', 'Poppy'] }
   ];
-  const PRICE = {
-    'Prissy': 60, 'Harmony': 60, 'Connor': 80, 'Carrie': 80,
-    'Pineapple': 100, 'Mel': 100, 'Blueberry Cow': 120, 'Bessie': 120,
-    'Mooni': 150, 'Mamu': 150, 'Ronnie': 180, 'ME': 200, 'Poppy': 250
-  };
-  const MALLOW_PER_POINTS = 5;
-  const MALLOW_PER_BADGE = 15;
+  const STARTERS = TIERS[0].buddies;
+  const TIER_GATE = 2;            // owned in the tier below to open the next
+  const MALLOW_RATE = 0.055;     // share of spawns that are a mallow, after the first few seconds
 
-  function priceOf(i){
-    const n = CHARS[i].name;
-    if(PRICE[n] !== undefined) return PRICE[n];
+  const CHAR_NAMES = CHARS.map(function(c){ return c.name; });
+  /* tier index for every character; a pair's hidden half sits with its tile */
+  const TIER_OF = CHARS.map(function(c, i){
+    for(let t = 0; t < TIERS.length; t++) if(TIERS[t].buddies.indexOf(c.name) > -1) return t;
     const m = swapPartner(i);
-    return (m >= 0 && PRICE[CHARS[m].name]) || 0;
-  }
+    if(m >= 0) for(let t = 0; t < TIERS.length; t++) if(TIERS[t].buddies.indexOf(CHARS[m].name) > -1) return t;
+    return TIERS.length - 1;
+  });
+  /* the tiles each tier shows, in order; anybody unlisted joins the last one */
+  const TIER_TILES = TIERS.map(function(t){
+    return t.buddies.map(function(n){ return CHAR_NAMES.indexOf(n); })
+      .filter(function(i){ return i > -1 && HIDDEN_IDS.indexOf(i) < 0; });
+  });
+  CHARS.forEach(function(c, i){
+    if(HIDDEN_IDS.indexOf(i) > -1) return;
+    if(!TIER_TILES.some(function(list){ return list.indexOf(i) > -1; })) TIER_TILES[TIERS.length - 1].push(i);
+  });
+  const TILE_ORDER = [].concat.apply([], TIER_TILES);
+
+  function priceOf(i){ return TIERS[TIER_OF[i]].price; }
 
   let mallows = Math.max(0, parseInt(loadJSON('squishMallows', 0), 10) || 0);
-  let unlocked = loadJSON('squishUnlocked', null);
-  if(!unlocked || typeof unlocked !== 'object'){
-    /* First visit since unlocks arrived. Nobody should open the game and find
-       a buddy they already play taken off them, so anyone with a best score
-       or a saved run on this phone comes unlocked. */
-    unlocked = {};
-    const pb = loadJSON('squishBuddyBest', {});
-    const runs = loadJSON('squishBoard', []);
-    CHARS.forEach(function(c, i){ if(pb[i] > 0) unlocked[i] = 1; });
-    (Array.isArray(runs) ? runs : []).forEach(function(r){ if(r && CHARS[r.ci]) unlocked[r.ci] = 1; });
-    saveJSON('squishUnlocked', unlocked);
-  }
+  let unlocked = loadJSON('squishUnlocked', {});
+  if(!unlocked || typeof unlocked !== 'object') unlocked = {};
   function isUnlocked(i){
-    if(priceOf(i) === 0 || unlocked[i]) return true;
+    if(unlocked[i]) return true;
     const m = swapPartner(i);
     return m >= 0 && !!unlocked[m];
   }
+  function ownedIn(t){
+    return TIER_TILES[t].filter(isUnlocked).length;
+  }
+  /* what the tier below needs before tier t opens: two of it, or all of it
+     if it ever has fewer than two */
+  function gateFor(t){ return t === 0 ? 0 : Math.min(TIER_GATE, TIER_TILES[t - 1].length); }
+  function tierOpen(t){ return t === 0 || ownedIn(t - 1) >= gateFor(t); }
+  function hasStarter(){ return TILE_ORDER.some(isUnlocked); }
 
   /* a little marshmallow with a face; outline white in the sky, pink on a card */
   function mallowArt(edge){
@@ -360,6 +396,10 @@
   const SHOT_SPEED = 830;     // pixels a second, straight up
   const POP_PAY = { rain: 2, bolt: 3 };
   let nextBossAt = BOSS_AT;
+
+  /* Mooni's dash: she counts as dashing while her smoothed speed is above
+     this, which scales with the screen so a phone and a laptop feel alike. */
+  function dashing(){ return !!perk.dashPay && Math.abs(leanVel) > Math.max(320, W * 0.85); }
 
   /* ---------------- combo + power-ups ---------------- */
   const COMBO_WINDOW = 3.6;          // base seconds to keep a streak alive
@@ -1078,38 +1118,26 @@
   function fillTile(b, i){
     const c = CHARS[i], pk = PERKS[c.name] || NO_PERK;
     const open = isUnlocked(i);
+    const sealed = !open && !tierOpen(TIER_OF[i]);
     b.dataset.ci = i;
     b.classList.toggle('locked', !open);
+    b.classList.toggle('sealed', sealed);
     b.innerHTML = '<img src="' + c.src + '" alt=""><span>' + c.name + '</span>' +
       '<span class="perk"><b>' + pk.t + '</b>' + pk.d + '</span>' +
       (swapPartner(i) >= 0 ? '<span class="twin">2 taps</span>' : '') +
-      (open ? '' : '<span class="lock">' + mallowIcon() + priceOf(i) + '</span>');
+      (open ? '' : sealed ? '<span class="lock">Tier ' + (TIER_OF[i] + 1) + '</span>'
+                          : '<span class="lock">' + mallowIcon() + priceOf(i) + '</span>');
   }
 
   function selectTile(b){
     const i = +b.dataset.ci;
     picked = i;
-    [].forEach.call(buddyGrid.children, function(el){ el.classList.remove('sel'); });
+    [].forEach.call(buddyGrid.querySelectorAll('.buddy'), function(el){ el.classList.remove('sel'); });
     b.classList.add('sel');
     showPerk(i);
   }
 
-  /* weakest first, strongest last; anybody not in PICK_ORDER on the end */
-  const TILE_ORDER = (function(){
-    const names = CHARS.map(function(c){ return c.name; });
-    const out = [];
-    PICK_ORDER.forEach(function(n){ const i = names.indexOf(n); if(i > -1) out.push(i); });
-    CHARS.forEach(function(c, i){ if(out.indexOf(i) < 0) out.push(i); });
-    return out.filter(function(i){ return HIDDEN_IDS.indexOf(i) < 0; });
-  })();
-  /* Start on Omar, an easy all-rounder, or the first buddy you own. */
-  (function(){
-    const omar = CHARS.map(function(c){ return c.name; }).indexOf('Omar');
-    picked = (omar > -1 && isUnlocked(omar)) ? omar
-      : (TILE_ORDER.filter(isUnlocked)[0] || TILE_ORDER[0]);
-  })();
-
-  TILE_ORDER.forEach(function(i){
+  function makeTile(i){
     const b = document.createElement('button');
     b.className = 'buddy' + (i === picked ? ' sel' : '');
     b.type = 'button';
@@ -1134,8 +1162,30 @@
       selectTile(b);
       sfx.tap();
     });
-    buddyGrid.appendChild(b);
-  });
+    return b;
+  }
+
+  /* The picker, tier by tier, each under a heading that says what it costs
+     or what opens it. Rebuilt whole whenever an unlock changes what is open. */
+  function buildPicker(){
+    if(!isUnlocked(picked)){
+      const own = TILE_ORDER.filter(isUnlocked);
+      if(own.length) picked = own[0];
+    }
+    buddyGrid.innerHTML = '';
+    TIERS.forEach(function(t, k){
+      const open = tierOpen(k);
+      const h = document.createElement('p');
+      h.className = 'tierhead' + (open ? '' : ' shut');
+      h.innerHTML = '<b>Tier ' + (k + 1) + ' \u00B7 ' + t.name + '</b><small>' +
+        (open ? mallowIcon() + t.price + ' each'
+              : '\uD83D\uDD12 own ' + gateFor(k) + ' from Tier ' + k + ' to open') + '</small>';
+      buddyGrid.appendChild(h);
+      TIER_TILES[k].forEach(function(i){ buddyGrid.appendChild(makeTile(i)); });
+    });
+  }
+
+  buildPicker();
 
   /* The play button doubles as the shop: on a locked buddy it offers the
      unlock, or says how far off you are. */
@@ -1143,6 +1193,12 @@
   function updateStart(){
     startBtn.classList.remove('buy', 'short');
     if(isUnlocked(picked)){ startBtn.textContent = "Let's play!"; return; }
+    const t = TIER_OF[picked];
+    if(!tierOpen(t)){
+      startBtn.classList.add('short');
+      startBtn.textContent = 'Own ' + gateFor(t) + ' Tier ' + t + ' buddies first';
+      return;
+    }
     const p = priceOf(picked);
     startBtn.classList.add('buy');
     if(mallows >= p){
@@ -1154,20 +1210,25 @@
   }
   function tryUnlock(){
     const p = priceOf(picked);
-    if(mallows < p){
+    if(mallows < p || !tierOpen(TIER_OF[picked])){
       sfx.bad(W / 2); buzz(HAPTIC.rain);
       startBtn.classList.remove('nope'); void startBtn.offsetWidth; startBtn.classList.add('nope');
       return;
     }
+    const wasOpen = TIERS.map(function(t, k){ return tierOpen(k); });
     mallows -= p;
     unlocked[picked] = 1;
     saveJSON('squishMallows', mallows);
     saveJSON('squishUnlocked', unlocked);
+    // this buy may have opened the next tier, so the whole picker is redrawn
+    buildPicker();
     const tile = buddyGrid.querySelector('.buddy.sel');
-    if(tile){
-      fillTile(tile, picked);
-      tile.classList.remove('swap'); void tile.offsetWidth; tile.classList.add('swap');
-    }
+    if(tile){ tile.classList.remove('swap'); void tile.offsetWidth; tile.classList.add('swap'); }
+    // a tier that this buy just opened gets a little fanfare of its own
+    const heads = buddyGrid.querySelectorAll('.tierhead');
+    TIERS.forEach(function(t, k){
+      if(tierOpen(k) && !wasOpen[k] && heads[k]) heads[k].classList.add('fresh');
+    });
     renderWallets();
     updateStart();
     sfx.fanfare(); buzz(HAPTIC.comboUp);
@@ -1194,21 +1255,68 @@
     sfx.tap();
   });
 
+  /* ---------------- choosing a starter ---------------- */
+  const screenStarter = document.getElementById('screenStarter');
+  const starterGrid = document.getElementById('starterGrid');
+  const starterBtn = document.getElementById('starterBtn');
+  let starterPick = -1;
+  function buildStarters(){
+    starterGrid.innerHTML = '';
+    starterPick = -1;
+    starterBtn.disabled = true;
+    starterBtn.textContent = 'Tap a buddy';
+    TIER_TILES[0].forEach(function(i){
+      const c = CHARS[i], pk = perkOf(i);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'buddy starter';
+      b.innerHTML = '<img src="' + c.src + '" alt=""><span>' + c.name + '</span>' +
+        '<span class="perk"><b>' + pk.t + '</b>' + pk.d + '</span>';
+      b.addEventListener('click', function(){
+        starterPick = i;
+        [].forEach.call(starterGrid.children, function(x){ x.classList.remove('sel'); });
+        b.classList.add('sel');
+        starterBtn.disabled = false;
+        starterBtn.textContent = 'I choose ' + c.name + '!';
+        document.getElementById('starterLong').textContent = pk.long || pk.d;
+        sfx.tap();
+      });
+      starterGrid.appendChild(b);
+    });
+    document.getElementById('starterLong').textContent = 'The other two can be unlocked later with mallows.';
+  }
+  starterBtn.addEventListener('click', function(){
+    if(starterPick < 0) return;
+    unlocked = {};
+    unlocked[starterPick] = 1;
+    saveJSON('squishUnlocked', unlocked);
+    picked = starterPick;
+    buildPicker();
+    sfx.fanfare(); buzz(HAPTIC.comboUp);
+    showPerk(picked);
+    show(screenPick);
+  });
+  function openPicker(){
+    if(!hasStarter()){ buildStarters(); show(screenStarter); return; }
+    showPerk(picked);
+    show(screenPick);
+  }
+
   function show(el){
-    [screenTitle, screenPick, screenOver, screenBoard, screenSquad, screenHelp]
+    [screenTitle, screenPick, screenOver, screenBoard, screenSquad, screenHelp, screenStarter]
       .forEach(function(s){ s.classList.add('hidden'); });
     if(el) el.classList.remove('hidden');
   }
   document.getElementById('helpBtn').addEventListener('click', function(){ sfx.tap(); show(screenHelp); });
   document.getElementById('helpBackBtn').addEventListener('click', function(){ sfx.tap(); show(screenTitle); });
 
-  document.getElementById('toPickBtn').addEventListener('click', function(){ audio(); sfx.tap(); showPerk(picked); show(screenPick); });
+  document.getElementById('toPickBtn').addEventListener('click', function(){ audio(); sfx.tap(); openPicker(); });
   startBtn.addEventListener('click', function(){
     if(!isUnlocked(picked)){ tryUnlock(); return; }
     sfx.tap(); begin();
   });
   document.getElementById('againBtn').addEventListener('click', function(){ sfx.tap(); begin(); });
-  document.getElementById('rePickBtn').addEventListener('click', function(){ sfx.tap(); showPerk(picked); show(screenPick); });
+  document.getElementById('rePickBtn').addEventListener('click', function(){ sfx.tap(); openPicker(); });
   /* mode + difficulty pickers */
   function wireSeg(id, attr, get, set){
     const root = document.getElementById(id);
@@ -1939,7 +2047,7 @@
       ? (0.05 + 0.03 * d) * (perk.mimicRate || 1) : 0;
 
     // a mallow now and then: the currency, so it never stops falling
-    const mallowC = elapsed > 4 ? 0.035 : 0;
+    const mallowC = elapsed > 4 ? MALLOW_RATE : 0;
 
     let kind = 'friend';
     if(r < starC) kind = 'star';
@@ -2460,7 +2568,7 @@
     const m = tier * (pwActive('x2') ? 2 : 1);
 
     if(f.kind === 'star'){
-      const sv = (perk.star || 5) * m + centrePay(f);
+      const sv = (perk.star || 5) * m + centrePay(f) + dashPay();
       score += sv;
       floatText('+' + sv, cx, cy, 'star');
       burst(cx, cy, ['#FFC53C','#FFE9A8','#FFF','#FF4F9A'], 26, 'spark');
@@ -2471,7 +2579,7 @@
       // a friend rescued off the ground out of Cheryl's web is worth extra
       const webSave = (f.webbed && perk.webTime) ? 1 : 0;
       const mateBonus = (perk.pairPay && f.ci === swapPartner(picked)) ? perk.pairPay : 0;
-      const fv = m + (perk.friendBonus || 0) + webSave + mateBonus + centrePay(f);
+      const fv = m + (perk.friendBonus || 0) + webSave + mateBonus + centrePay(f) + dashPay();
       score += fv;
       floatText(m > 1 ? '+' + fv + '  x' + m : '+' + fv, cx, cy);
       burst(cx, cy, ['#FF4F9A','#2FCBBD','#FFC53C','#8C6BFF','#FFF'], 16);
@@ -2486,6 +2594,11 @@
   /* Prissy's bonus for a catch landed in the middle of her rather than on the
      edge of her reach. The catch loop marks the faller with how far off centre
      it was, as a fraction of the reach, just before it calls hit(). */
+  function dashPay(){
+    if(!dashing()) return 0;
+    burst(px, groundY - playerSize() * 0.6, ['#FF4F9A','#FFC53C','#93E4AC','#78DEFF','#8C6BFF'], 10, 'spark');
+    return perk.dashPay;
+  }
   function centrePay(f){
     if(!perk.centre || !(f.off < 0.32)) return 0;
     floatText('perfect!', f.x, f.y - 46, 'close');
@@ -2846,6 +2959,11 @@
         // just been hit: clouds pass through for a moment so two in a row
         // cannot take two hearts before there is any chance to move
         if(mercyT > 0 && (f.kind === 'rain' || f.kind === 'bolt' || f.kind === 'bus') && !(f.kind === 'bolt' && perk.boltImmune)) continue;
+        // Mooni rushes straight through rain while she is dashing
+        if(f.kind === 'rain' && perk.dashDodge && dashing()){
+          if(!f.dodged){ f.dodged = 1; floatText('whoosh!', f.x + wob, f.y, 'close'); sfx.whoosh(f.x + wob); }
+          continue;
+        }
         f.off = Math.abs(ddx) / rr;
         f.x = f.x + wob;
         hit(f);
@@ -3064,19 +3182,14 @@
     if(diffKey === 'storm' && score >= 60) award('tempest');
     if(earned.length) saveJSON('squishBadges', badges);
 
-    // mallows: points, the ones you caught, and a bonus per new badge
-    const pointMallows = Math.floor(Math.max(0, score) / MALLOW_PER_POINTS);
-    const badgeMallows = earned.length * MALLOW_PER_BADGE;
-    const gotMallows = pointMallows + runMallows + badgeMallows;
+    // mallows: only the ones you caught
+    const gotMallows = runMallows;
     if(gotMallows){
       mallows += gotMallows;
       saveJSON('squishMallows', mallows);
-      const why = [];
-      if(pointMallows) why.push(pointMallows + ' for points');
-      if(runMallows) why.push(runMallows + ' caught');
-      if(badgeMallows) why.push(badgeMallows + ' badge bonus');
-      // the cheapest buddy still locked, so the jar always points somewhere
-      const next = TILE_ORDER.filter(function(i){ return !isUnlocked(i); })
+      const why = [gotMallows + ' caught'];
+      // the cheapest buddy you are allowed to buy, so the jar always points somewhere
+      const next = TILE_ORDER.filter(function(i){ return !isUnlocked(i) && tierOpen(TIER_OF[i]); })
         .sort(function(a, b){ return priceOf(a) - priceOf(b); })[0];
       if(next !== undefined){
         why.push(mallows >= priceOf(next)

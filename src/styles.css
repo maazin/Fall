@@ -947,3 +947,29 @@ h2{
 }
 .tally li.mallow b{color:#D2589A;display:inline-flex;align-items:center;gap:4px}
 @media (prefers-reduced-motion: reduce){ #startBtn.nope{animation:none} }
+
+/* ---------------- tiers and the starter choice ---------------- */
+.tierhead{
+  grid-column:1/-1;margin:14px 0 0;text-align:left;
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  font-family:"Baloo 2",sans-serif;color:var(--plum);
+}
+.tierhead:first-child{margin-top:4px}
+.tierhead b{font-size:16px;font-weight:800}
+.tierhead small{font-family:"Nunito",sans-serif;font-weight:900;font-size:11.5px;color:var(--plum-soft);display:inline-flex;align-items:center;gap:3px}
+.tierhead.shut{opacity:.7}
+.tierhead.fresh{animation:tierOpen 1.1s ease}
+@keyframes tierOpen{0%,100%{color:var(--plum)}30%{color:var(--bubblegum);transform:scale(1.06)}}
+
+/* a tier you cannot buy into yet: darker, and priced by tier rather than mallows */
+.buddy.sealed img{filter:grayscale(1) brightness(.7);opacity:.45}
+.buddy.sealed .perk{opacity:.6}
+.buddy.sealed .lock{background:#EEE6F2;color:var(--plum-soft)}
+.buddy.sealed .lock::before{content:"\1F512"}
+
+.buddies.starters{grid-template-columns:repeat(3,minmax(0,1fr));max-width:520px;margin:18px auto 0}
+.buddy.starter img{transform:scale(1.04)}
+.buddy.starter.sel{transform:translateY(-6px)}
+#starterBtn[disabled]{background:#E4DAEA;color:var(--plum-soft);box-shadow:0 6px 0 #C9BBD3;cursor:default}
+#starterLong{min-height:3em}
+@media (prefers-reduced-motion: reduce){ .tierhead.fresh{animation:none} }

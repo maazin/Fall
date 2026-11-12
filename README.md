@@ -100,38 +100,57 @@ directly.
 3. Add the slug to `ROSTER` in `api/scores.mjs`, so it counts on the main
    board, and to `BUDDIES` in `sw.js` so it is cached offline.
 4. Optionally give it a perk in `PERKS` (keyed by the same name).
-5. Put its name in `PICK_ORDER` where its power belongs, and give it a price
-   in `PRICE`. Left out of `PICK_ORDER` it goes at the end of the picker; left
-   out of `PRICE` it is free.
+5. Put its name in a tier in `TIERS`, in order of power. Left out, it joins
+   the last tier at that tier's price.
 
-## Unlocks and mallows
+## Starters, tiers and mallows
 
-The picker runs weakest to strongest, so the buddies that bend the game most
-sit at the bottom. The first eight are free; the rest cost **mallows**, little
-marshmallows that are the game's currency:
+A new player chooses one of three starters, and everyone else is locked.
+The rest are bought with **mallows**, little marshmallows that are the game's
+currency, one tier at a time: a tier only opens once you own two buddies from
+the tier below (`TIER_GATE`), so nobody can save up and jump straight to the
+top. The picker runs tier by tier, weakest at the top, with the buddies that
+bend the game most at the bottom.
 
-| Price | Buddies |
-| --- | --- |
-| free | Grandpa Herbie, Lazy Harp Seal, Butt Nugget, Sophie, Pip, Cheryl, Pep, Omar |
-| 60 | Prissy, Harmony |
-| 80 | Connor, Carrie |
-| 100 | Pineapple, Mel |
-| 120 | Blueberry Cow, Bessie |
-| 150 | Mooni, Mamu |
-| 180 | Ronnie (his milk comes with him) |
-| 200 | ME (Devin comes with her) |
-| 250 | Poppy |
+| Tier | Price each | Buddies |
+| --- | --- | --- |
+| 1 Starters | choose 1 free, 15 for the others | Omar, Sophie, Pep |
+| 2 Squishlings | 25 | Lazy Harp Seal, Butt Nugget, Grandpa Herbie |
+| 3 Sprouts | 35 | Pip, Cheryl, Prissy |
+| 4 Snugglers | 50 | Harmony, Connor, Carrie |
+| 5 Champions | 65 | Pineapple, Mel, Blueberry Cow |
+| 6 Legends | 80 | Bessie, Mamu, Ronnie (his milk comes with him) |
+| 7 Mythic | 100 | Mooni, ME (Devin comes with her), Poppy |
 
-You earn them three ways: they float down during a run (catching one does not
-touch your score or streak), you get one for every 5 points you finish on, and
-each new badge pays 15. A locked buddy's tile is greyed and priced, its perk
-still reads in full, and the play button turns into the unlock button. The
-results screen says how far you are from the next one.
+Every tier after the starters holds three buddies, the same as the starters.
+
+The only way to earn mallows is to catch them: they float down during a run
+(`MALLOW_RATE` of spawns once the first few seconds are over), and catching
+one does not touch your score or streak. Nothing is paid out for points or
+badges. A decent minute-long run catches three to five.
+
+That puts the second starter about four runs away, so the first unlock comes
+early, and then the prices climb: reaching Mythic means owning two buddies in
+every tier below it, which is a long-term goal. Every run still drops some
+mallows, so the loop always pays, but you have to go and get them.
+
+A locked tile is greyed and priced; a tile in a tier that is not open yet is
+darker and just says its tier. Its perk still reads in full either way, and the
+play button turns into the unlock button or says what you need first. The
+results screen says how far you are from the next buddy you can buy.
 
 Mallows and unlocks live on the phone, like the squad book, under
-`squishMallows` and `squishUnlocked`. The first time a phone loads this version
-anyone it already has a best score or a saved run with comes unlocked, so
-nobody loses a buddy they were already playing.
+`squishMallows` and `squishUnlocked`.
+
+### Starting everyone over
+
+`SAVE_VERSION` at the top of `src/game.js` is the local equivalent of
+`BOARD_RESET`. Bump it and every phone clears its squad book, badges, bests,
+saved runs, mallows and unlocks the first time it loads the new version, and
+goes back to choosing a starter. Sound, flash and difficulty settings and the
+board name are kept. Version 2 is the relaunch with starters and tiers, which
+went out with `BOARD_RESET = 2` so the global board started over at the same
+time.
 
 ### Pairs
 
@@ -232,8 +251,8 @@ character counts.
 
 It used to be divided by the whole roster. Once buddies had to be unlocked that
 punished new players for the ones they could not play yet, and every new buddy
-added lowered everyone's score. Ten is reachable with the eight free buddies
-and two unlocks, which is the point.
+added lowered everyone's score. Ten is roughly where the tiers take you on the
+way to the top, which is the point.
 
 Deriving it rather than keeping a second sorted set in step means the board can
 never disagree with the per-buddy boards, and it needed no migration when it

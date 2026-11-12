@@ -169,6 +169,17 @@ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
     </div>
   </section>
 
+  <!-- STARTER: the very first time, you choose one of three -->
+  <section class="screen hidden" id="screenStarter">
+    <div class="card">
+      <p class="eyebrow">A brand new squad</p>
+      <h2>Choose your first buddy</h2>
+      <div class="buddies starters" id="starterGrid"></div>
+      <p class="lede" id="starterLong"></p>
+      <div class="btn-row"><button class="btn" id="starterBtn" disabled>Tap a buddy</button></div>
+    </div>
+  </section>
+
   <!-- SQUAD BOOK -->
   <section class="screen hidden" id="screenSquad">
     <div class="card">

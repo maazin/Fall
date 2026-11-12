@@ -39,7 +39,7 @@ export const SEASON_TTL = 75 * 24 * 60 * 60;        // seconds
  * on exactly on schedule either way.
  *
  * POST /api/reset is the other way, and that one does delete. */
-export const BOARD_RESET = 1;
+export const BOARD_RESET = 2;   // 2: the relaunch with starters and tiers
 
 export function seasonNumber(now) {
   const d = new Date(now === undefined ? Date.now() : now);
