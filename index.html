@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="description" content="A 60-second arcade game: slide your squishmallow buddy around and catch the squad falling out of the sky.">
+<meta name="description" content="An endless arcade game: slide your squishmallow buddy around and catch the squad falling out of the sky.">
 <meta name="theme-color" content="#8FDEFF">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,11 +14,11 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Squish Squad Catch">
-<meta property="og:description" content="Catch the falling squad before the timer runs out!">
+<meta property="og:description" content="Catch the falling squad for as long as your hearts last!">
 <meta property="og:image" content="assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Squish Squad Catch">
-<meta name="twitter:description" content="Catch the falling squad before the timer runs out!">
+<meta name="twitter:description" content="Catch the falling squad for as long as your hearts last!">
 <meta name="twitter:image" content="assets/og.png">
 <title>Squish Squad Catch</title>
 <script>
@@ -73,7 +73,7 @@ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
 
   <div id="hud" class="hidden">
     <div class="pill"><span class="cap">Score</span><span id="scoreVal">0</span></div>
-    <div class="pill" id="timePill"><span class="cap">Time</span><span id="timeVal">60</span></div>
+    <div class="pill" id="timePill"><span class="cap">Survived</span><span id="timeVal">0</span></div>
     <div id="comboPill"><span id="comboVal">x2</span><span id="comboBar"><i></i></span></div>
     <div id="pwRow"></div>
     <div id="hearts"></div>
@@ -101,12 +101,6 @@ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
       <p class="eyebrow">A very squishy game</p>
       <h1>Squish Squad Catch</h1>
       <p class="lede">Slide left and right to catch the squad falling out of the sky.</p>
-
-      <p class="seg-label">Mode</p>
-      <div class="seg" id="modeSeg">
-        <button type="button" data-mode="round" class="sel">60 seconds<small>Beat the clock</small></button>
-        <button type="button" data-mode="endless">Endless<small>Until your hearts go</small></button>
-      </div>
 
       <p class="seg-label">Difficulty</p>
       <div class="seg" id="diffSeg">

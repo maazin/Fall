@@ -1,7 +1,7 @@
 # Fall — Squish Squad Catch
 
-A 60-second arcade game: slide your squishmallow buddy around and catch the squad
-falling out of the sky. Plain HTML, CSS and JavaScript — no build step — plus two
+An endless arcade game: slide your squishmallow buddy around and catch the squad
+falling out of the sky for as long as your hearts last. Plain HTML, CSS and JavaScript — no build step — plus two
 small Vercel serverless functions for the shared scoreboard.
 
 ## Layout
@@ -130,7 +130,7 @@ Push to GitHub with the repo connected to Vercel. Environment variables:
 | Variable | Purpose |
 | --- | --- |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Redis REST credentials for the scoreboard (the Upstash / `REDIS_REST_*` names are accepted too). Without them the board is disabled. |
-| `BOARD_SEASON` | Optional. Pins the board to one season number instead of following the clock; unset to go back to the fortnightly rollover. |
+| `BOARD_SEASON` | Optional. Pins the board to one season number instead of following the clock; unset to go back to the monthly rollover. |
 | `ADMIN_TOKEN` | Optional. Enables `POST /api/reset` with an `x-admin-token` header. Unset means the route refuses everything. |
 
 ## Scoring
@@ -146,16 +146,21 @@ difficulty's heart count so that bravery is worth something:
 | Storm | 2 | 20 | 40 | +36% of catches |
 
 A flat rate paid Chill 60 against Storm's 24, which made the gentlest setting
-the highest-scoring one at any realistic score. Note the shared board still
-mixes all four mode/difficulty combinations into one ranking, and Endless never
-earns the survival pot at all — separate boards are the fix, not done yet.
+the highest-scoring one at any realistic score.
+
+Endless is now the only mode (nobody played the 60 second one), and an Endless
+run ends when the hearts do, so the survival pot above is never paid any more:
+the brave bonus is what separates the difficulties. The round-mode code is left
+in `game.js` so runs saved under it still read "60s" on the scores screen.
 
 ## The shared board
 
-Seasons last a fortnight and roll over on their own: the number comes from the
-clock, anchored to a Monday midnight UTC so it always turns at the same time of
-the same weekday, and every key sits under `fall:s<n>:`. Moving the prefix on is
-the whole reset. Old seasons are given a 60-day TTL so they do not pile up.
+Seasons last a calendar month and roll over on their own at midnight UTC on the
+1st: season 1 is January 2026 and the number counts months from there, so it
+comes from the clock and nobody has to remember to bump it. Every key sits under
+`fall:m<n>r<reset>:` (the `m` keeps monthly numbers clear of the old fortnightly
+`fall:s<n>` keys). Moving the prefix on is the whole reset. Old seasons are given
+a 75-day TTL so last month is still there to look at but they do not pile up.
 `BOARD_SEASON` still overrides if you want to pin or replay one.
 
 ### Resetting the board
@@ -165,7 +170,7 @@ Two ways, and both act on the season that is live right now:
 - **Bump `BOARD_RESET` in `api/_board.mjs` and deploy.** It is part of the key
   prefix, so the board is empty from the moment the deploy lands. Nothing is
   deleted: the old keys run out on their TTL, and setting the number back brings
-  them straight back. The fortnightly rollover carries on on schedule.
+  them straight back. The monthly rollover carries on on schedule.
 - **`POST /api/reset`** with an `x-admin-token` header matching `ADMIN_TOKEN`.
   This one does delete.
 
@@ -177,7 +182,7 @@ looked at, still answering 200.
 `SEASON_CRITERIA` in `api/scores.mjs` lists the rankings the board rotates
 through, one per season. It currently holds a single entry, so every season is
 the squad average; add `'best'`, `'buddies'` or `'top5'` and it starts
-alternating a fortnight at a time. All four are already implemented and all are
+alternating a month at a time. All four are already implemented and all are
 computed from the per-buddy bests, so none needs a bigger score payload.
 
 The per-buddy sorted sets (`fall:b:<buddy>`, one best per player per character)

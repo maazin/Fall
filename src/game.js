@@ -54,9 +54,9 @@
                         tiers:[4, 10, 16], window:1.5,
                         long:'You hit x2 at 4 catches, x3 at 10 and x4 at 16, instead of 5, 12 and 20. Your streak also survives 50% longer between catches, so she lives at a high multiplier while everyone else is still building one.' },
 
-    'Pineapple':      { t:'Sunshine',       d:'Ten more seconds on the clock',
-                        extraTime:10, grace:15,
-                        long:'Your round is 70 seconds instead of 60. In Endless, nothing dangerous spawns for the first 15 seconds so you get a free run at building a streak. She is the only buddy who changes how long you play.' },
+    'Pineapple':      { t:'Sunshine',       d:'20 seconds of clear sky to start',
+                        grace:20,
+                        long:'Every round opens with 20 seconds of sunshine: no rain, no lightning and no bus until then, so you get a free run at building a streak before the weather can touch you. Connor only pushes the storm back; she is the only buddy who keeps the sky completely clear.' },
 
     'Blueberry Cow':  { t:'Jelly Pull',     d:'Always a little magnetic',
                         pull:1, magnetBoost:1.7,
@@ -68,7 +68,7 @@
 
     'Mel':            { t:'Melon Shell',    d:'Holds two shields',
                         shield:1, shieldMax:2,
-                        long:'You start with a shield and can stack two at once, where everyone else caps at one, so each bubble is two free hits. Any shield you still hold when the clock runs out pays 12 points, so not needing them is its own reward.' },
+                        long:'You start with a shield and can stack two at once, where everyone else caps at one, so each bubble is two free hits, which in a round that only ends when your hearts do is worth more than it sounds.' },
 
     'Cheryl':         { t:'Sticky Web',     d:'Web saves missed friends for +1',
                         webTime:1.7,
@@ -234,13 +234,15 @@
     normal: { hearts:3, pace:1.00, boltAt:22, heartPay:12, label:'Normal' },
     storm:  { hearts:2, pace:1.34, boltAt:16, heartPay:20, label:'Storm'  }
   };
-  let mode = 'round';
+  /* Endless is the only mode now: nobody played the 60 second one. The round
+     code paths are left in place rather than torn out, so runs saved under it
+     still label themselves "60s" on the scores screen. */
+  let mode = 'endless';
   let diffKey = 'normal';
   function diff(){ return DIFFS[diffKey]; }
   function isEndless(){ return mode === 'endless'; }
   try{
-    const sm = localStorage.getItem('squishMode'); if(DIFFS[localStorage.getItem('squishDiff')]) diffKey = localStorage.getItem('squishDiff');
-    if(sm === 'endless' || sm === 'round') mode = sm;
+    if(DIFFS[localStorage.getItem('squishDiff')]) diffKey = localStorage.getItem('squishDiff');
   }catch(e){}
 
   let W = 0, H = 0, groundY = 0;
@@ -1091,9 +1093,6 @@
       });
     });
   }
-  wireSeg('modeSeg', 'mode', function(){ return mode; }, function(v){
-    mode = v; try{ localStorage.setItem('squishMode', v); }catch(e){}
-  });
   wireSeg('diffSeg', 'diff', function(){ return diffKey; }, function(v){
     diffKey = v; try{ localStorage.setItem('squishDiff', v); }catch(e){}
   });
@@ -1340,7 +1339,7 @@
     const v = Number(n);
     return isFinite(v) ? String(Math.floor(v)) : '0';
   }
-  /* How long this fortnight has left, for the line under the board. */
+  /* How long this month's board has left, for the line under the board. */
   function untilReset(iso){
     const end = Date.parse(iso);
     if(!isFinite(end)) return '';
@@ -1360,7 +1359,7 @@
 
   /* ---------------- squad book + badges ---------------- */
   const BADGES = [
-    { id:'flawless2', t:'Untouchable', d:'Finish a full 60s round on Normal or Storm without losing a heart', ico:'\u2764\uFE0F' },
+    { id:'flawless2', t:'Untouchable', d:'Last 60 seconds on Normal or Storm without losing a heart', ico:'\u2764\uFE0F' },
     { id:'streak20',  t:'On a roll',   d:'Reach a x4 streak of 20 catches without a hit',                      ico:'\u26A1' },
     { id:'storm2',    t:'Storm rider', d:'Survive the boss untouched on Normal or Storm',                     ico:'\u26C8\uFE0F' },
     { id:'score100',  t:'Centurion',   d:'Score 100 in a single run',                                         ico:'\u2B50' },
@@ -1485,7 +1484,7 @@
     maxHearts = diff().hearts + (perk.hearts || 0);
     shieldCap = perk.shieldMax || 1;
     shield = perk.shield ? 1 : 0;
-    score = 0; hearts = maxHearts; timeLeft = roundLen(); combo = 0; elapsed = 0; spawnT = 0;
+    score = 0; hearts = maxHearts; timeLeft = roundLen(); combo = 0; elapsed = 0; spawnT = 0; firstHurtAt = Infinity;
     waveIdx = 0; paused = false; trailT = 0; mercyT = 0; dragId = -1;
     comboT = 0; bestCombo = 0; bossCleared = false; mimicsCaught = 0; purseUses = 0;
     pw.magnet = 0; pw.slow = 0; pw.x2 = 0; pw.blaster = 0;
@@ -2144,7 +2143,9 @@
      two thirds of the streak rather than all of it: losing a x4 run to one
      cloud was the moment people put the phone down, but keeping half of it
      made the multiplier too cheap to hold. */
+  let firstHurtAt = Infinity;   // when the run first cost a heart, for Untouchable
   function tookHit(){
+    if(firstHurtAt === Infinity) firstHurtAt = elapsed;
     combo = Math.floor(combo / 3); comboT = combo > 0 ? comboWindow() : 0; drawCombo();
     mercyT = MERCY;
     player.classList.add('mercy');
@@ -2902,7 +2903,7 @@
     const earned = [];
     const hard = diffKey !== 'chill';                       // Chill no longer counts for the tough ones
     function award(id){ if(!badges[id]){ badges[id] = 1; earned.push(id); } }
-    if(fullRound && hard && hearts === maxHearts && score > 0) award('flawless2');
+    if(hard && firstHurtAt >= 60 && elapsed >= 60 && score > 0) award('flawless2');
     if(bestCombo >= 20) award('streak20');
     if(bossCleared && hard) award('storm2');
     if(score >= 100) award('score100');

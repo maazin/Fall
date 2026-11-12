@@ -40,7 +40,7 @@ const TOKEN =
 
 /* Seasons, the reset generation and the key prefix all live in _board.mjs,
    shared with reset.mjs so the two can never disagree about where the board
-   is. See that file for how the fortnight works. */
+   is. See that file for how the monthly seasons work. */
 const SEASON_N = currentSeason(process.env);
 const SEASON = String(SEASON_N);
 const NS = namespace(SEASON_N);
@@ -48,7 +48,7 @@ const NS = namespace(SEASON_N);
 /* How the top player is decided, rotated one per season.
  *
  * Add any of 'best', 'buddies' or 'top5' to this list and the board will start
- * alternating between them a fortnight at a time; with a single entry it is
+ * alternating between them a month at a time; with a single entry it is
  * simply that one every season. Every ranking here is computed from the
  * per-buddy bests that are already stored, so none of them needs the client to
  * send anything extra. */
@@ -294,8 +294,8 @@ export default async function handler(req, res) {
       const writes = [];
       if (beatBuddy) writes.push(['ZADD', bk, String(score), name]);
       /* Every season leaves its keys behind, so they are given a life. Reset on
-         each write rather than only on create, so a season stays for 60 days
-         after its last post rather than 60 days after its first. */
+         each write rather than only on create, so a season stays for 75 days
+         after its last post rather than 75 days after its first. */
       if (bk) writes.push(['EXPIRE', bk, String(SEASON_TTL)]);
       writes.push(['EXPIRE', HKEY, String(SEASON_TTL)]);
       {

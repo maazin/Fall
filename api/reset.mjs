@@ -11,7 +11,7 @@
  *
  * This wipes the season that is live right now, the same keys scores.mjs is
  * reading and writing: both get the prefix from _board.mjs. (They used to
- * work it out separately, and after the move to fortnightly seasons this
+ * work it out separately, and after the move to seasons this
  * route was quietly deleting the old pre-season keys while the live board
  * went untouched.)
  *
