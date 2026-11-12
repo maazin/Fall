@@ -101,6 +101,7 @@ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
       <p class="eyebrow">A very squishy game</p>
       <h1>Squish Squad Catch</h1>
       <p class="lede">Slide left and right to catch the squad falling out of the sky.</p>
+      <p class="wallet" id="titleWallet"></p>
 
       <p class="seg-label">Difficulty</p>
       <div class="seg" id="diffSeg">
@@ -130,6 +131,7 @@ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
       <div class="rules">
         <div class="rule"><span class="chip" id="ruleFriend"></span><span>Catch a friend<small>+1 point</small></span></div>
         <div class="rule"><span class="chip">⭐</span><span>Grab a star<small>+5 points</small></span></div>
+        <div class="rule"><span class="chip" id="ruleMallow"></span><span>Catch a mallow<small>spend them to unlock buddies</small></span></div>
         <div class="rule"><span class="chip">🌧️</span><span>Dodge grumpy rain<small>−1 heart</small></span></div>
         <div class="rule"><span class="chip">⚡</span><span>Watch for lightning<small>−1 heart, fast!</small></span></div>
         <div class="rule"><span class="chip">🚌</span><span>Dodge Herbie’s bus<small>blinds you, then your heart falls back</small></span></div>
@@ -153,6 +155,7 @@ if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
     <div class="card">
       <p class="eyebrow">Step 1 of 1</p>
       <h2>Who's catching today?</h2>
+      <p class="wallet" id="pickWallet"></p>
       <div class="perkbox" id="perkBox">
         <img id="perkImg" alt="">
         <div>

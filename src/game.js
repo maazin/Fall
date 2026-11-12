@@ -176,6 +176,78 @@
     .filter(function(i){ return TWIN_IDS.indexOf(i) < 0 && PRIVATE_IDS.indexOf(i) < 0; });
   function perkOf(i){ return PERKS[CHARS[i].name] || NO_PERK; }
 
+  /* ---------------- unlocks and mallows ----------------
+     The picker runs weakest to strongest, so the buddies that bend the game
+     most sit at the bottom and cost the most to bring home. The first eight
+     are free. A pair's second half comes with the first: unlock ME and Devin
+     is behind her tile, unlock Ronnie and his milk comes too.
+
+     Mallows are the currency: little marshmallows that float down during a
+     run, plus one for every MALLOW_PER_POINTS points you finish on and a
+     handful for every new badge. They live on this phone only, like the
+     squad book.
+
+     Anybody missing from PRICE is free, so a new buddy is playable on day one
+     until someone decides what it should cost. Anybody missing from
+     PICK_ORDER goes on the end of the picker. */
+  const PICK_ORDER = [
+    'Grandpa Herbie', 'Lazy Harp Seal', 'Butt Nugget', 'Sophie', 'Pip', 'Cheryl', 'Pep', 'Omar',
+    'Prissy', 'Harmony', 'Connor', 'Carrie', 'Pineapple', 'Mel', 'Blueberry Cow', 'Bessie',
+    'Mooni', 'Mamu', 'Ronnie', 'ME', 'Poppy'
+  ];
+  const PRICE = {
+    'Prissy': 60, 'Harmony': 60, 'Connor': 80, 'Carrie': 80,
+    'Pineapple': 100, 'Mel': 100, 'Blueberry Cow': 120, 'Bessie': 120,
+    'Mooni': 150, 'Mamu': 150, 'Ronnie': 180, 'ME': 200, 'Poppy': 250
+  };
+  const MALLOW_PER_POINTS = 5;
+  const MALLOW_PER_BADGE = 15;
+
+  function priceOf(i){
+    const n = CHARS[i].name;
+    if(PRICE[n] !== undefined) return PRICE[n];
+    const m = swapPartner(i);
+    return (m >= 0 && PRICE[CHARS[m].name]) || 0;
+  }
+
+  let mallows = Math.max(0, parseInt(loadJSON('squishMallows', 0), 10) || 0);
+  let unlocked = loadJSON('squishUnlocked', null);
+  if(!unlocked || typeof unlocked !== 'object'){
+    /* First visit since unlocks arrived. Nobody should open the game and find
+       a buddy they already play taken off them, so anyone with a best score
+       or a saved run on this phone comes unlocked. */
+    unlocked = {};
+    const pb = loadJSON('squishBuddyBest', {});
+    const runs = loadJSON('squishBoard', []);
+    CHARS.forEach(function(c, i){ if(pb[i] > 0) unlocked[i] = 1; });
+    (Array.isArray(runs) ? runs : []).forEach(function(r){ if(r && CHARS[r.ci]) unlocked[r.ci] = 1; });
+    saveJSON('squishUnlocked', unlocked);
+  }
+  function isUnlocked(i){
+    if(priceOf(i) === 0 || unlocked[i]) return true;
+    const m = swapPartner(i);
+    return m >= 0 && !!unlocked[m];
+  }
+
+  /* a little marshmallow with a face; outline white in the sky, pink on a card */
+  function mallowArt(edge){
+    return '<path d="M22 40v30c0 7 12.5 12 28 12s28-5 28-12V40" fill="#FFF3F8" stroke="' + edge + '" stroke-width="5" stroke-linejoin="round"/>' +
+      '<ellipse cx="50" cy="40" rx="28" ry="11" fill="#FFC9E1" stroke="' + edge + '" stroke-width="5"/>' +
+      '<circle cx="41" cy="60" r="3.6" fill="#4B2A55"/><circle cx="59" cy="60" r="3.6" fill="#4B2A55"/>' +
+      '<path d="M45 67c2.5 3 7.5 3 10 0" stroke="#4B2A55" stroke-width="3.4" fill="none" stroke-linecap="round"/>' +
+      '<ellipse cx="34" cy="66" rx="4.5" ry="2.6" fill="#FF9EC7" opacity=".85"/><ellipse cx="66" cy="66" rx="4.5" ry="2.6" fill="#FF9EC7" opacity=".85"/>';
+  }
+  function mallowIcon(){
+    return '<svg class="mlw" viewBox="14 24 72 64" aria-hidden="true">' + mallowArt('#E9A6C6') + '</svg>';
+  }
+  function renderWallets(){
+    const html = mallowIcon() + '<b>' + mallows + '</b> mallow' + (mallows === 1 ? '' : 's');
+    ['titleWallet', 'pickWallet'].forEach(function(id){
+      const el = document.getElementById(id);
+      if(el) el.innerHTML = html;
+    });
+  }
+
   const app = document.getElementById('app');
   const world = document.getElementById('world');
   const stage = document.getElementById('stage');
@@ -264,6 +336,7 @@
   /* the buddy leans into her own movement and breathes when she is still */
   let leanVel = 0, bobT = 0;
   let runCaught = {};
+  let runMallows = 0;           // mallows caught in the sky this run
   let bestCombo = 0, bossCleared = false, mimicsCaught = 0, purseUses = 0;
   let bossEl = null, bossState = 'none', bossT = 0, bossX = 0, bossDir = 1, bossShots = 0, bossHurt = false;
   const BOSS_AT = 44, BOSS_SHOTS = 8;
@@ -1004,10 +1077,13 @@
      out of the way when you tap her twice, which is roughly how they get on. */
   function fillTile(b, i){
     const c = CHARS[i], pk = PERKS[c.name] || NO_PERK;
+    const open = isUnlocked(i);
     b.dataset.ci = i;
+    b.classList.toggle('locked', !open);
     b.innerHTML = '<img src="' + c.src + '" alt=""><span>' + c.name + '</span>' +
       '<span class="perk"><b>' + pk.t + '</b>' + pk.d + '</span>' +
-      (swapPartner(i) >= 0 ? '<span class="twin">2 taps</span>' : '');
+      (swapPartner(i) >= 0 ? '<span class="twin">2 taps</span>' : '') +
+      (open ? '' : '<span class="lock">' + mallowIcon() + priceOf(i) + '</span>');
   }
 
   function selectTile(b){
@@ -1018,11 +1094,24 @@
     showPerk(i);
   }
 
-  CHARS.forEach(function(c, i){
-    // the second of each pair has no tile: it lives behind the first one
-    if(HIDDEN_IDS.indexOf(i) > -1) return;
+  /* weakest first, strongest last; anybody not in PICK_ORDER on the end */
+  const TILE_ORDER = (function(){
+    const names = CHARS.map(function(c){ return c.name; });
+    const out = [];
+    PICK_ORDER.forEach(function(n){ const i = names.indexOf(n); if(i > -1) out.push(i); });
+    CHARS.forEach(function(c, i){ if(out.indexOf(i) < 0) out.push(i); });
+    return out.filter(function(i){ return HIDDEN_IDS.indexOf(i) < 0; });
+  })();
+  /* Start on Omar, an easy all-rounder, or the first buddy you own. */
+  (function(){
+    const omar = CHARS.map(function(c){ return c.name; }).indexOf('Omar');
+    picked = (omar > -1 && isUnlocked(omar)) ? omar
+      : (TILE_ORDER.filter(isUnlocked)[0] || TILE_ORDER[0]);
+  })();
+
+  TILE_ORDER.forEach(function(i){
     const b = document.createElement('button');
-    b.className = 'buddy' + (i === 0 ? ' sel' : '');
+    b.className = 'buddy' + (i === picked ? ' sel' : '');
     b.type = 'button';
     fillTile(b, i);
     let lastTap = 0;
@@ -1048,6 +1137,42 @@
     buddyGrid.appendChild(b);
   });
 
+  /* The play button doubles as the shop: on a locked buddy it offers the
+     unlock, or says how far off you are. */
+  const startBtn = document.getElementById('startBtn');
+  function updateStart(){
+    startBtn.classList.remove('buy', 'short');
+    if(isUnlocked(picked)){ startBtn.textContent = "Let's play!"; return; }
+    const p = priceOf(picked);
+    startBtn.classList.add('buy');
+    if(mallows >= p){
+      startBtn.innerHTML = 'Unlock for ' + p + ' ' + mallowIcon();
+    } else {
+      startBtn.classList.add('short');
+      startBtn.innerHTML = (p - mallows) + ' more ' + mallowIcon() + ' to unlock';
+    }
+  }
+  function tryUnlock(){
+    const p = priceOf(picked);
+    if(mallows < p){
+      sfx.bad(W / 2); buzz(HAPTIC.rain);
+      startBtn.classList.remove('nope'); void startBtn.offsetWidth; startBtn.classList.add('nope');
+      return;
+    }
+    mallows -= p;
+    unlocked[picked] = 1;
+    saveJSON('squishMallows', mallows);
+    saveJSON('squishUnlocked', unlocked);
+    const tile = buddyGrid.querySelector('.buddy.sel');
+    if(tile){
+      fillTile(tile, picked);
+      tile.classList.remove('swap'); void tile.offsetWidth; tile.classList.add('swap');
+    }
+    renderWallets();
+    updateStart();
+    sfx.fanfare(); buzz(HAPTIC.comboUp);
+  }
+
   const perkBox = document.getElementById('perkBox');
   const perkMore = document.getElementById('perkMore');
   function showPerk(i){
@@ -1059,6 +1184,7 @@
     // a fresh buddy always starts collapsed, so the panel keeps its height
     perkBox.classList.remove('open');
     if(perkMore) perkMore.textContent = 'more';
+    updateStart();
   }
   /* Clamped to three lines because it is a sticky header now and Herbie's
      write-up is a paragraph. Tap it for the rest. */
@@ -1077,7 +1203,10 @@
   document.getElementById('helpBackBtn').addEventListener('click', function(){ sfx.tap(); show(screenTitle); });
 
   document.getElementById('toPickBtn').addEventListener('click', function(){ audio(); sfx.tap(); showPerk(picked); show(screenPick); });
-  document.getElementById('startBtn').addEventListener('click', function(){ sfx.tap(); begin(); });
+  startBtn.addEventListener('click', function(){
+    if(!isUnlocked(picked)){ tryUnlock(); return; }
+    sfx.tap(); begin();
+  });
   document.getElementById('againBtn').addEventListener('click', function(){ sfx.tap(); begin(); });
   document.getElementById('rePickBtn').addEventListener('click', function(){ sfx.tap(); showPerk(picked); show(screenPick); });
   /* mode + difficulty pickers */
@@ -1488,7 +1617,7 @@
     waveIdx = 0; paused = false; trailT = 0; mercyT = 0; dragId = -1;
     comboT = 0; bestCombo = 0; bossCleared = false; mimicsCaught = 0; purseUses = 0;
     pw.magnet = 0; pw.slow = 0; pw.x2 = 0; pw.blaster = 0;
-    runCaught = {};
+    runCaught = {}; runMallows = 0;
     if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
     app.scrollLeft = 0; app.scrollTop = 0;    // belt and braces where overflow:clip is missing
     blindOn = !!perk.blind; lastBlindX = -999; earT = 0; busBlindT = 0;
@@ -1809,6 +1938,9 @@
     const mimicC = (perk.mimicAlly && elapsed > 10 && COW_IDS.length)
       ? (0.05 + 0.03 * d) * (perk.mimicRate || 1) : 0;
 
+    // a mallow now and then: the currency, so it never stops falling
+    const mallowC = elapsed > 4 ? 0.035 : 0;
+
     let kind = 'friend';
     if(r < starC) kind = 'star';
     else if(r < starC + boltC) kind = 'bolt';
@@ -1816,6 +1948,7 @@
     else if(r < starC + boltC + rainC + busC) kind = 'bus';
     else if(r < starC + boltC + rainC + busC + pwC) kind = pickPowerUp();
     else if(r < starC + boltC + rainC + busC + pwC + mimicC) kind = 'mimic';
+    else if(r < starC + boltC + rainC + busC + pwC + mimicC + mallowC) kind = 'mallow';
 
     if(kind === 'bus'){
       // a bus is a big thing, so it gets a bigger box and is kept off the edges
@@ -1826,7 +1959,7 @@
     }
 
     const atX = s/2 + Math.random() * Math.max(1, W - s);
-    if(kind === 'bolt') telegraphBolt(atX, s); else spawnAt(kind, atX, s);
+    if(kind === 'bolt') telegraphBolt(atX, s); else spawnAt(kind, atX, kind === 'mallow' ? s * 0.78 : s);
 
     // a lamb never goes anywhere by herself
     if(kind === 'friend' && perk.flock && Math.random() < perk.flock){
@@ -1907,6 +2040,10 @@
         ? mate
         : FALLABLE[(Math.random() * FALLABLE.length) | 0];
       el.innerHTML = '<div class="art"><img src="' + CHARS[ci].src + '" alt=""></div>';
+    } else if(kind === 'mallow'){
+      el.classList.add('mallow');
+      el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%;filter:drop-shadow(0 0 9px rgba(255,158,199,.95))">' +
+        mallowArt('#fff') + '</svg></div>';
     } else if(kind === 'star'){
       el.innerHTML = '<div class="art"><svg viewBox="0 0 100 100" style="width:100%;height:100%;filter:drop-shadow(0 0 10px rgba(255,197,60,.9))">' +
         '<path d="M50 6l12.6 25.6 28.3 4.1-20.5 20 4.9 28.2L50 70.6 24.7 83.9l4.9-28.2-20.5-20 28.3-4.1z" fill="#FFC53C" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>' +
@@ -1951,6 +2088,7 @@
           // a bus is heavy but dramatic: slow enough that you see it coming
           * (kind === 'bus' ? 0.78 : 1)
           * (isGift(kind) ? 0.72 : 1)
+          * (kind === 'mallow' ? 0.82 : 1)
           * (perk.fall || 1),
       sway: (Math.random() * 2 - 1) * (kind === 'bolt' ? 10 : kind === 'bus' ? 8 : kind === 'mimic' ? 34 + 26 * d : 20 + 26 * d),
       webbed: 0,
@@ -2185,6 +2323,17 @@
       freeze(0.05);
       buzz(HAPTIC.mimic);
       player.classList.remove('squish'); void player.offsetWidth; player.classList.add('squish');
+      return;
+    }
+
+    /* A mallow is pocket money, not points: it does not touch the score or
+       the streak, it just goes in the jar for the end of the run. */
+    if(f.kind === 'mallow'){
+      runMallows++;
+      ripple(cx, cy, f.size * 1.3, 'rgba(255,201,225,.95)');
+      floatText('+1 mallow', cx, cy, 'close');
+      burst(cx, cy, ['#FFC9E1','#FF9EC7','#FFF3F8','#FFF'], 16, 'spark');
+      sfx.star(cx); buzz(HAPTIC.gift);
       return;
     }
 
@@ -2653,7 +2802,7 @@
       f.el.style.transform = 'translate(' + dx + 'px,' + (f.y - f.size/2) + 'px)';
 
       // magnet power-up sweeps everything friendly toward you; Jelly Pull is the gentler perk
-      const wantPull = (f.kind === 'friend' || f.kind === 'star');
+      const wantPull = (f.kind === 'friend' || f.kind === 'star' || f.kind === 'mallow');
       if(wantPull && pwActive('magnet')){
         const gap = pcx - f.x;
         const strength = 250 * (perk.magnetBoost ? 1.35 : 1);
@@ -2915,6 +3064,29 @@
     if(diffKey === 'storm' && score >= 60) award('tempest');
     if(earned.length) saveJSON('squishBadges', badges);
 
+    // mallows: points, the ones you caught, and a bonus per new badge
+    const pointMallows = Math.floor(Math.max(0, score) / MALLOW_PER_POINTS);
+    const badgeMallows = earned.length * MALLOW_PER_BADGE;
+    const gotMallows = pointMallows + runMallows + badgeMallows;
+    if(gotMallows){
+      mallows += gotMallows;
+      saveJSON('squishMallows', mallows);
+      const why = [];
+      if(pointMallows) why.push(pointMallows + ' for points');
+      if(runMallows) why.push(runMallows + ' caught');
+      if(badgeMallows) why.push(badgeMallows + ' badge bonus');
+      // the cheapest buddy still locked, so the jar always points somewhere
+      const next = TILE_ORDER.filter(function(i){ return !isUnlocked(i); })
+        .sort(function(a, b){ return priceOf(a) - priceOf(b); })[0];
+      if(next !== undefined){
+        why.push(mallows >= priceOf(next)
+          ? 'enough to unlock ' + CHARS[next].name + '!'
+          : (priceOf(next) - mallows) + ' more for ' + CHARS[next].name);
+      }
+      tallyRow('Mallows', why.join(' \u00B7 '), '+' + gotMallows + ' ' + mallowIcon(), 'mallow');
+    }
+    renderWallets();
+
     // leaderboard
     let rank = -1;
     if(score > 0){
@@ -2980,6 +3152,9 @@
     };
   }
 
+  renderWallets();
+  const ruleMallow = document.getElementById('ruleMallow');
+  if(ruleMallow) ruleMallow.innerHTML = mallowIcon();
   buildPwChips();
   makeFlowers();
   makeStars();

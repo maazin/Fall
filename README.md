@@ -97,9 +97,41 @@ directly.
    Append, never insert: the squad book and the per-buddy bests are keyed by
    position in that array, so slotting one into the middle silently re-labels
    every record after it.
-3. Add the slug to `ROSTER` in `api/scores.mjs`, which is the divisor for the
-   main board, and to `BUDDIES` in `sw.js` so it is cached offline.
+3. Add the slug to `ROSTER` in `api/scores.mjs`, so it counts on the main
+   board, and to `BUDDIES` in `sw.js` so it is cached offline.
 4. Optionally give it a perk in `PERKS` (keyed by the same name).
+5. Put its name in `PICK_ORDER` where its power belongs, and give it a price
+   in `PRICE`. Left out of `PICK_ORDER` it goes at the end of the picker; left
+   out of `PRICE` it is free.
+
+## Unlocks and mallows
+
+The picker runs weakest to strongest, so the buddies that bend the game most
+sit at the bottom. The first eight are free; the rest cost **mallows**, little
+marshmallows that are the game's currency:
+
+| Price | Buddies |
+| --- | --- |
+| free | Grandpa Herbie, Lazy Harp Seal, Butt Nugget, Sophie, Pip, Cheryl, Pep, Omar |
+| 60 | Prissy, Harmony |
+| 80 | Connor, Carrie |
+| 100 | Pineapple, Mel |
+| 120 | Blueberry Cow, Bessie |
+| 150 | Mooni, Mamu |
+| 180 | Ronnie (his milk comes with him) |
+| 200 | ME (Devin comes with her) |
+| 250 | Poppy |
+
+You earn them three ways: they float down during a run (catching one does not
+touch your score or streak), you get one for every 5 points you finish on, and
+each new badge pays 15. A locked buddy's tile is greyed and priced, its perk
+still reads in full, and the play button turns into the unlock button. The
+results screen says how far you are from the next one.
+
+Mallows and unlocks live on the phone, like the squad book, under
+`squishMallows` and `squishUnlocked`. The first time a phone loads this version
+anyone it already has a best score or a saved run with comes unlocked, so
+nobody loses a buddy they were already playing.
 
 ### Pairs
 
@@ -181,31 +213,36 @@ looked at, still answering 200.
 
 `SEASON_CRITERIA` in `api/scores.mjs` lists the rankings the board rotates
 through, one per season. It currently holds a single entry, so every season is
-the squad average; add `'best'`, `'buddies'` or `'top5'` and it starts
-alternating a month at a time. All four are already implemented and all are
+the top ten average; add `'average'`, `'best'`, `'buddies'` or `'top5'` and it starts
+alternating a month at a time. All five are already implemented and all are
 computed from the per-buddy bests, so none needs a bigger score payload.
 
 The per-buddy sorted sets (`fall:b:<buddy>`, one best per player per character)
 are the only thing stored. The main board is derived from them on read:
 
 ```
-average = floor( (sum of your best with each character) / 20 )
+top ten = floor( (sum of your best with your ten strongest characters) / 10 )
 ```
 
-Divided by the whole roster, not by however many you have tried, so characters
-you have never played count as zero, and floored, because a leaderboard reads
-better in whole numbers. One lucky run with one buddy is worth 300/20 = 15;
-being decently good with eight of them beats it comfortably at 84. The
-only way up is to go and get good with somebody new, and a bad run can never
-cost you anything, because only your best with each character counts.
+Always divided by ten, so with fewer than ten played the gaps count as zero,
+and floored, because a leaderboard reads better in whole numbers. One lucky run
+of 300 with one buddy is worth 30; being decently good with ten of them beats
+it. A bad run can never cost you anything, because only your best with each
+character counts.
+
+It used to be divided by the whole roster. Once buddies had to be unlocked that
+punished new players for the ones they could not play yet, and every new buddy
+added lowered everyone's score. Ten is reachable with the eight free buddies
+and two unlocks, which is the point.
 
 Deriving it rather than keeping a second sorted set in step means the board can
 never disagree with the per-buddy boards, and it needed no migration when it
 stopped being a max and started being a mean. The old `fall:best` key is left
 alone and simply no longer read.
 
-`ROSTER` in `api/scores.mjs` is the divisor and **must be kept in step with
-`CHARS` in `src/game.js`** (twenty-three characters as of Poppy, Prissy and Harmony). A character missing from it still gets its own
+`ROSTER` in `api/scores.mjs` lists the characters that count and **must be
+kept in step with `CHARS` in `src/game.js`** (twenty-three characters as of
+Poppy, Prissy and Harmony). A character missing from it still gets its own
 per-buddy board but contributes nothing to the main one.
 
 Picking a single buddy from the dropdown still shows plain best runs for that

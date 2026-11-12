@@ -6,15 +6,16 @@
  *   <ns>meta       hash, player name -> JSON of when they last posted
  *
  * The per-buddy sets are the only source of truth. The main board is not
- * stored at all: it is the average of a player's best with each of the
- * characters on the roster, divided by the whole roster rather than by however
- * many they happen to have tried, so it answers "who is good with the whole
- * squad" rather than "who had one lucky run".
+ * stored at all: it is the average of a player's best with their ten
+ * strongest buddies, always divided by ten, so it answers "who is good with a
+ * squad of their own" rather than "who had one lucky run".
  *
- *   average = (sum of their best with each buddy) / ROSTER.length
+ *   top10 = (sum of their ten highest per-buddy bests) / 10
  *
- * Characters they have never played count as zero, which is the point: the
- * only way up the board is to go and get good with somebody new.
+ * Fewer than ten played count the gaps as zero, so the way up is to get good
+ * with somebody new. It used to be divided by the whole roster; once buddies
+ * had to be unlocked, that punished new players for the ones they could not
+ * play yet. The old ranking is still in CRITERIA as 'average'.
  *
  * Deriving it on read rather than keeping a second sorted set in step means
  * the board can never disagree with the per-buddy boards, and it needed no
@@ -52,9 +53,24 @@ const NS = namespace(SEASON_N);
  * simply that one every season. Every ranking here is computed from the
  * per-buddy bests that are already stored, so none of them needs the client to
  * send anything extra. */
-const SEASON_CRITERIA = ['average'];
+const SEASON_CRITERIA = ['top10'];
+
+/* The mean of a player's best K buddies, divided by K whether or not they
+   have played that many: a top ten needs ten buddies in it, so someone with
+   one brilliant run and nothing else cannot sit on top. Floored to match
+   everything else on the board. */
+function topAverage(scores, k) {
+  const top = scores.slice().sort((a, b) => b - a).slice(0, k);
+  return Math.floor(top.reduce((a, b) => a + b, 0) / k);
+}
 
 const CRITERIA = {
+  top10: {
+    label: 'Top ten average',
+    blurb: 'Your best with each of your ten strongest buddies, averaged over ten. Fewer than ten played counts the missing ones as zero.',
+    of: 10,
+    score: (p) => topAverage(p.scores, 10)
+  },
   average: {
     label: 'Squad average',
     blurb: 'Your best with each character, averaged over the whole roster. Ones you have never played count as zero.',
@@ -157,8 +173,8 @@ async function overallRows() {
         name: p.name,
         score: c.def.score(p, ROSTER.length),
         tie: c.def.tie ? c.def.tie(p, ROSTER.length) : 0,
-        buddies: p.buddies,
-        roster: ROSTER.length,
+        buddies: c.def.of ? Math.min(p.buddies, c.def.of) : p.buddies,
+        roster: c.def.of || ROSTER.length,
         best: p.best,
         buddy: p.bestBuddy,
         mode: m.mode || null,
@@ -274,22 +290,33 @@ export default async function handler(req, res) {
       /* Every one of their per-buddy bests, so the average can be reported
          back without a second round trip after the write. */
       const prev = await redis(ROSTER.map((s2) => ['ZSCORE', NS + 'b:' + s2, name]));
-      let sum = 0;
       let buddyBest = -1;
+      const vals = {};
       ROSTER.forEach((s2, i) => {
         const raw = prev[i] && prev[i].result;
         const val = (raw === null || raw === undefined) ? 0 : Number(raw);
-        if (Number.isFinite(val) && val > 0) sum += val;
+        if (Number.isFinite(val) && val > 0) vals[s2] = val;
         if (s2 === slug) buddyBest = (raw === null || raw === undefined) ? -1 : Number(raw);
       });
 
-      // floored, to match how the board shows it
-      const avg = (total) => Math.floor(total / ROSTER.length);
-      const wasAvg = avg(sum);
+      // the same numbers the board is built from, run through this season's
+      // ranking before and after this post
+      const crit = criterionFor(SEASON_N).def;
+      const rate = (v) => {
+        const scores = Object.values(v);
+        const p = {
+          sum: scores.reduce((a, b) => a + b, 0),
+          buddies: scores.length,
+          best: scores.length ? Math.max(...scores) : 0,
+          scores
+        };
+        return crit.score(p, ROSTER.length);
+      };
+      const wasAvg = rate(vals);
       const beatBuddy = !!bk && score > buddyBest;
-      // beating your own best with one character lifts the average by the
-      // difference, spread over the whole roster
-      const nowAvg = beatBuddy ? avg(sum - Math.max(0, buddyBest) + score) : wasAvg;
+      const after = Object.assign({}, vals);
+      if (beatBuddy && ROSTER.indexOf(slug) > -1) after[slug] = score;
+      const nowAvg = beatBuddy ? rate(after) : wasAvg;
 
       const writes = [];
       if (beatBuddy) writes.push(['ZADD', bk, String(score), name]);
