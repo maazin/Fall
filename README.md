@@ -114,8 +114,8 @@ bend the game most at the bottom.
 
 | Tier | Price each | Buddies |
 | --- | --- | --- |
-| 1 Starters | choose 1 free, 40 for the others | Omar, Sophie, Pep |
-| 2 Squishlings | 60 | Lazy Harp Seal, Butt Nugget, Grandpa Herbie |
+| 1 Starters | choose 1 free, 15 for the others | Omar, Sophie, Pep |
+| 2 Squishlings | 25 | Lazy Harp Seal, Butt Nugget, Grandpa Herbie |
 | 3 Sprouts | 90 | Pip, Cheryl, Prissy |
 | 4 Snugglers | 130 | Harmony, Connor, Carrie |
 | 5 Champions | 180 | Pineapple, Mel, Blueberry Cow |
@@ -129,9 +129,10 @@ The only way to earn mallows is to catch them: they float down during a run
 one does not touch your score or streak. Nothing is paid out for points or
 badges. A decent minute-long run catches three to five.
 
-That puts the second starter around ten runs away, and well out of reach of
-any single run, however long: a great three-minute run catches a dozen or so.
-After that the prices climb: reaching Mythic means owning two buddies in
+The first two tiers are cheap on purpose: the second starter is a few runs
+away and Tier 2 not long after, so a new player gets their first unlocks
+early and learns how it works. From Tier 3 the prices jump to 90 and keep
+climbing, well out of reach of any single run, so the rest has to be earned: reaching Mythic means owning two buddies in
 every tier below it, which is a long-term goal. Every run still drops some
 mallows, so the loop always pays, but you have to go and get them.
 

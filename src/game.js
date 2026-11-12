@@ -215,8 +215,8 @@
      Anybody missing from TIERS goes in the last tier at its price, so a new
      buddy always has a home until someone decides where it belongs. */
   const TIERS = [
-    { name: 'Starters',    price: 40,   buddies: ['Omar', 'Sophie', 'Pep'] },
-    { name: 'Squishlings', price: 60,   buddies: ['Lazy Harp Seal', 'Butt Nugget', 'Grandpa Herbie'] },
+    { name: 'Starters',    price: 15,   buddies: ['Omar', 'Sophie', 'Pep'] },
+    { name: 'Squishlings', price: 25,   buddies: ['Lazy Harp Seal', 'Butt Nugget', 'Grandpa Herbie'] },
     { name: 'Sprouts',     price: 90,   buddies: ['Pip', 'Cheryl', 'Prissy'] },
     { name: 'Snugglers',   price: 130,  buddies: ['Harmony', 'Connor', 'Carrie'] },
     { name: 'Champions',   price: 180,  buddies: ['Pineapple', 'Mel', 'Blueberry Cow'] },
